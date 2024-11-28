@@ -41,7 +41,7 @@ class Matriz:
         self.COL_TEXT = 12
         pass
 
-    def inserir(self, button: QPushButton) -> None:
+    def inserir(self, button: QPushButton) -> str:
         try:
             self.caminho = askopenfilename()
             if self.caminho == '':
@@ -49,8 +49,7 @@ class Matriz:
             self.__validar_entrada()
             with open(self.caminho, 'r+'):
                 ...
-            button.setText(self.caminho[self.caminho.rfind('/') +1:])
-            button.setIcon(QPixmap(''))
+            return self.caminho[self.caminho.rfind('/') +1:]
 
         except PermissionError:
             messagebox.showerror(title='Aviso', message= 'O arquivo selecionado apresenta-se em aberto em outra janela, favor fecha-la')
@@ -111,6 +110,11 @@ class Matriz:
 
 class Acessorias:
     CHROME_DRIVER_PATH = resource_path('src\\drivers\\chromedriver.exe')
+    URL = ''
+
+    def __init__(self, obrigacoes) -> None:
+        self.obrigacoes_desejadas = [i for i in obrigacoes]
+        pass
 
     def make_chrome_browser(self,*options: str, hide = True) -> webdriver.Chrome:
         chrome_options = webdriver.ChromeOptions()
@@ -132,6 +136,15 @@ class Acessorias:
             browser.set_window_position(-10000,0)
 
         return browser
+    
+    def login(self, usuario: str, senha: str):
+        ...
+
+    def pesquisar_entrega(self, num_empresa, competencia):
+        ...
+
+    def pesquisar_empresa(self, num_empresa, competencia):
+        ...
 
 class Wellington(QObject):
     valor = Signal(str)
@@ -139,13 +152,46 @@ class Wellington(QObject):
     fim = Signal()
 
     def __init__(self) -> None:
+        self.infos_empresa = {
+            'Nome': list(),
+            'CNPJ': list()
+        }
+
+        self.obrigacao = {
+            'FGTS': list(),
+            'PROLABORE': list(),
+            'Resumo de tributos': list(),
+            'Domestico': list(),
+        }
+
+        self.credenciais = ''
+
         pass
 
+    def trabalhar(self, info_matriz: list[str], competencia: str) -> pd.DataFrame:
+        browser = Acessorias(self.obrigacao.keys())
+
+        for method, dict_values in {
+            browser.pesquisar_entrega: self.obrigacao.values(), 
+            browser.pesquisar_empresa: self.infos_empresa.values()
+            }.items():
+            for num in info_matriz:
+                for index, listas in enumerate(dict_values):
+                    listas.append(method(num, competencia)[index])
+
+        return pd.DataFrame(
+            self.infos_empresa,
+            self.obrigacao
+        )
 
 class MainWindow(QMainWindow, Ui_MainWindow):
+    MAX_PROGRESS = 100
+
     def __init__(self, parent = None):
         super().__init__(parent)
         self.setupUi(self)
+
+        self.matriz = Matriz()
 
         self.setWindowIcon((QIcon(
             resource_path('src\\imgs\\acessorias_icon.ico'))))
@@ -157,28 +203,33 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.movie = QMovie(resource_path("src\\imgs\\load.gif"))
         self.load_movie.setMovie(self.movie)
 
+        self.pushButton_upload.clicked.connect(self.inserir_arquivo)
+        self.pushButton_enviar.clicked.connect(self.hard_work)
+
+    def inserir_arquivo(self):
+        self.pushButton_upload.setText(self.matriz.inserir())
+        self.pushButton_upload.setIcon(QPixmap(''))
+
     def hard_work(self):
         try:
-            if self.file.envio_invalido():
+            if self.matriz.envio_invalido():
                 raise Exception('Favor anexar seu relatório de processos')
             
-            list_processos = self.file.ler()
-            self.posicao = self.MAX_PROGRESS / len(list_processos)
+            nums_empresas = self.matriz.ler()
+            self.posicao = self.MAX_PROGRESS / len(nums_empresas)
 
             self.exec_load(True)
-            self.pushButton.setDisabled(True)
-
-            self.juiz = Wellington(list_processos)
+            self.wellington = Wellington(nums_empresas)
             self._thread = QThread()
 
-            self.juiz.moveToThread(self._thread)
-            self._thread.started.connect(self.juiz.pesquisar)
-            self.juiz.fim.connect(self._thread.quit)
-            self.juiz.fim.connect(self._thread.deleteLater)
-            self.juiz.fim.connect(self.encerramento)
-            self._thread.finished.connect(self.juiz.deleteLater)
-            self.juiz.valor.connect(self.to_captcha) 
-            self.juiz.progress.connect(self.to_progress)
+            self.wellington.moveToThread(self._thread)
+            self._thread.started.connect(self.wellington.trabalhar)
+            self.wellington.fim.connect(self._thread.quit)
+            self.wellington.fim.connect(self._thread.deleteLater)
+            self.wellington.fim.connect(self.encerramento)
+            self._thread.finished.connect(self.wellington.deleteLater)
+            self.wellington.valor.connect(self.to_captcha) 
+            self.wellington.progress.connect(self.to_progress)
 
             self._thread.start()  
 
@@ -190,25 +241,16 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def encerramento(self, result):
         #TODO encerramento
-        invalidos = self.filtro(result)
-        for index, i in enumerate(invalidos):
-            if len(i) != 0:
-                messagebox.showwarning('Aviso', \
-                    f'{self.text_aviso[index]} \n {'\n'.join(f'- {x}' for x in i)}')
+        
             
-        self.file.alterar(result)
-        self.file.abrir()
+        self.matriz.alterar(result)
+        self.matriz.abrir()
 
         self.exec_load(False, 0)
         self.pushButton.setDisabled(False)
 
     def to_progress(self, valor):
         self.progressBar.setValue(self.posicao * valor)
-
-    def enviar_resp(self):
-        self.juiz.set_captcha(self.lineEdit.text())
-        self.lineEdit.setText('')
-        self.exec_load(True)
 
     def exec_load(self, action: bool, to = 1):
         if action == True:
