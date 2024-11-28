@@ -3,3 +3,4 @@
 *.autosave
 *~
 *.env
+code/src/__pycache__
