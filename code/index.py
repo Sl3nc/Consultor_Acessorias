@@ -3,6 +3,7 @@ import os
 import sys
 import traceback
 from unidecode import unidecode
+from time import sleep
 
 import pandas as pd
 from pandas.errors import ParserError
@@ -27,6 +28,11 @@ from src.window_acessorias import Ui_MainWindow
 from tkinter import messagebox
 from tkinter.filedialog import askopenfilename
 
+import json
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).parent / 'src' / 'env' / '.env')
+
 def resource_path(relative_path):
     base_path = getattr(
         sys,
@@ -37,51 +43,56 @@ def resource_path(relative_path):
 class Matriz:
     def __init__(self) -> None:
         self.tipos_validos = 'lsx'
-        self.caminho = ''
+        self.caminho = None
         self.COL_TEXT = 12
         pass
 
-    def inserir(self, button: QPushButton) -> str:
+    def inserir(self) -> str | None:
         try:
-            self.caminho = askopenfilename()
-            if self.caminho == '':
-                return
-            self.__validar_entrada()
-            with open(self.caminho, 'r+'):
+            caminho = askopenfilename()
+            with open(caminho, 'r+'):
                 ...
+            self.caminho = self.__validar_entrada(caminho)
             return self.caminho[self.caminho.rfind('/') +1:]
 
         except PermissionError:
             messagebox.showerror(title='Aviso', message= 'O arquivo selecionado apresenta-se em aberto em outra janela, favor fecha-la')
+            return None
+
         except FileExistsError:
             messagebox.showerror(title='Aviso', message= 'O arquivo selecionado já apresenta uma versão sem acento, favor usar tal versão ou apagar uma delas')
+            return None
+
         except Exception as error:
             messagebox.showerror(title='Aviso', message= error)
-
-    def __validar_entrada(self) -> str:
-        if self.caminho == '':
             return None
-        self.__tipo()
-        caminho_uni = unidecode(self.caminho)
-        if self.caminho != caminho_uni:
-            self.caminho = self.__renomear(caminho_uni)
 
-    def __tipo(self) -> bool:
-        if self.caminho[len(self.caminho) -3 :] != self.tipos_validos:
-            ultima_barra = self.caminho.rfind('/')
+    def __validar_entrada(self, caminho: str) -> str:
+        # if caminho == '':
+        #     return None
+        
+        if caminho[len(caminho) -3 :] != self.tipos_validos:
+            ultima_barra = caminho.rfind('/')
             raise Exception(
-                f'Formato inválido do arquivo: {self.caminho[ultima_barra+1:]}')
-        return True
+                f'Formato inválido do arquivo: {caminho[ultima_barra+1:]}'
+            )
+        
+        caminho_uni = unidecode(caminho)
+        if caminho != caminho_uni:
+            caminho = self.__renomear(caminho_uni)
 
-    def __renomear(self, caminho) -> str:
-        os.renames(self.caminho, caminho)
+        return caminho
+
+    def __renomear(self, caminho, caminho_uni) -> str:
+        os.renames(caminho, caminho_uni)
         return caminho
     
     def envio_invalido(self) -> bool:
-        return True if len(self.caminho) == 0 else False
+        return True if self.caminho == None else False
 
     def ler(self) -> list:
-        return pd.read_excel(self.caminho, usecols='E').dropna().values.tolist()
+        return pd.read_excel(self.caminho, usecols='A', header= None)\
+            .dropna().values.tolist()
 
     def alterar(self, conteudo) -> None:
         #TODO Alterar
@@ -110,10 +121,23 @@ class Matriz:
 
 class Acessorias:
     CHROME_DRIVER_PATH = resource_path('src\\drivers\\chromedriver.exe')
-    URL = ''
+    URL_MAIN = ''
+    URL_ENTREGAS = 'https://app.acessorias.com/sysmain.php?m=3'
+    URL_EMPRESA = 'https://app.acessorias.com/sysmain.php?m=4'
+
+    INPUT_EMAIL = 'mailAC'
+    INPUT_PASSWORD= 'passAC'
+    BTN_ENTRAR = '#site-corpo > section.secao.secao-login > div > form > div.botoes > button'
+
+    BTN_PESQUISA = 'searchEmp'
+    BTN_FILTRAR = 'btFilter'
+    TABELA_ENTREGAS = 'divRelEntregas'
 
     def __init__(self, obrigacoes) -> None:
         self.obrigacoes_desejadas = [i for i in obrigacoes]
+
+        self.browser = self.make_chrome_browser()
+        self.browser.get(self.URL_MAIN)
         pass
 
     def make_chrome_browser(self,*options: str, hide = True) -> webdriver.Chrome:
@@ -138,12 +162,36 @@ class Acessorias:
         return browser
     
     def login(self, usuario: str, senha: str):
-        ...
+        try:
+            self.browser.find_element(By.NAME, self.INPUT_EMAIL).send_keys(usuario)
+            self.browser.find_element(By.NAME, self.INPUT_PASSWORD).send_keys(senha)
+
+            self.browser.find_element(By.CSS_SELECTOR, self.BTN_ENTRAR)
+
+            sleep(10)
+        except:
+            print('Sem Login')
 
     def pesquisar_entrega(self, num_empresa, competencia):
-        ...
+        if self.browser.current_url != self.URL_ENTREGAS:
+            self.browser.get(self.URL_ENTREGAS)
 
-    def pesquisar_empresa(self, num_empresa, competencia):
+        self.browser.find_element(By.ID, self.BTN_PESQUISA).send_keys(num_empresa)
+
+        self.browser.find_element(By.ID, self.BTN_FILTRAR).click()
+
+        sleep(5)
+
+        self.extrir_dados(
+            self.browser.find_element(By.ID, self.TABELA_ENTREGAS)
+        )
+
+    def extrir_dados(self, tabela: WebElement):
+        for i in tabela.find_elements(By.CLASS_NAME, 'neg brown'):
+            print(i.text())
+
+
+    def pesquisar_empresa(self, num_empresa):
         ...
 
 class Wellington(QObject):
@@ -164,16 +212,19 @@ class Wellington(QObject):
             'Domestico': list(),
         }
 
-        self.credenciais = ''
-
+        self.credenciais = [
+            json.loads(os.environ['LOGIN']),
+            json.loads(os.environ['SENHA'])
+        ]
         pass
 
     def trabalhar(self, info_matriz: list[str], competencia: str) -> pd.DataFrame:
-        browser = Acessorias(self.obrigacao.keys())
+        acessorias = Acessorias(self.obrigacao.keys())
+        acessorias.login(self.credenciais[0], self.credenciais[1])
 
         for method, dict_values in {
-            browser.pesquisar_entrega: self.obrigacao.values(), 
-            browser.pesquisar_empresa: self.infos_empresa.values()
+            acessorias.pesquisar_entrega: self.obrigacao.values(), 
+            acessorias.pesquisar_empresa: self.infos_empresa.values()
             }.items():
             for num in info_matriz:
                 for index, listas in enumerate(dict_values):
@@ -207,8 +258,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.pushButton_enviar.clicked.connect(self.hard_work)
 
     def inserir_arquivo(self):
-        self.pushButton_upload.setText(self.matriz.inserir())
-        self.pushButton_upload.setIcon(QPixmap(''))
+        resp = self.matriz.inserir()
+
+        if resp != None:
+            self.pushButton_upload.setText(resp)
+            self.pushButton_upload.setIcon(QPixmap(''))
 
     def hard_work(self):
         try:
@@ -216,14 +270,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 raise Exception('Favor anexar seu relatório de processos')
             
             nums_empresas = self.matriz.ler()
-            self.posicao = self.MAX_PROGRESS / len(nums_empresas)
+            self.max_progress_bar = self.MAX_PROGRESS / len(nums_empresas)
 
             self.exec_load(True)
-            self.wellington = Wellington(nums_empresas)
+            self.wellington = Wellington()
             self._thread = QThread()
 
             self.wellington.moveToThread(self._thread)
-            self._thread.started.connect(self.wellington.trabalhar)
+            self._thread.started.connect(
+                lambda: self.wellington.trabalhar(
+                    nums_empresas, self.dateEdit_competencia.text())
+                )
             self.wellington.fim.connect(self._thread.quit)
             self.wellington.fim.connect(self._thread.deleteLater)
             self.wellington.fim.connect(self.encerramento)
@@ -250,7 +307,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.pushButton.setDisabled(False)
 
     def to_progress(self, valor):
-        self.progressBar.setValue(self.posicao * valor)
+        self.progressBar.setValue(self.max_progress_bar * valor)
 
     def exec_load(self, action: bool, to = 1):
         if action == True:
