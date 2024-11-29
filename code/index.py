@@ -127,9 +127,13 @@ class Acessorias:
     INPUT_PASSWORD= 'passAC'
     BTN_ENTRAR = '#site-corpo > section.secao.secao-login > div > form > div.botoes > button'
 
-    BTN_PESQUISA = 'searchEmp'
+    BTN_PESQUISA_ENTREGAS = 'searchEmp'
+    BTN_PESQUISA_EMP = 'searchString'
     BTN_FILTRAR = 'btFilter'
     TABELA_ENTREGAS = 'divRelEntregas'
+    
+    POSIC_NOME_EMP = '#divEmpZ_{0} > div.col-sm-5.col-xs-12.no-padding.aImage > span'
+    POSIC_CNPJ_EMP = '#divEmpZ_{0} > div.col-sm-7.col-xs-12.no-padding.aImage > div:nth-child(1)'
 
     def __init__(self, obrigacoes) -> None:
         self.obrigacoes_desejadas = [i for i in obrigacoes]
@@ -162,26 +166,15 @@ class Acessorias:
 
         return browser
     
+    #TODO ACESSORIAS
     def login(self, usuario: str, senha: str):
         self.browser.find_element(By.NAME, self.INPUT_EMAIL).send_keys(usuario)
         self.browser.find_element(By.NAME, self.INPUT_PASSWORD).send_keys(senha)
 
         self.browser.find_element(By.CSS_SELECTOR, self.BTN_ENTRAR).click()
 
-
     def pesquisar_entrega(self, num_empresa):
-        if self.browser.current_url != self.URL_ENTREGAS:
-            self.browser.get(self.URL_ENTREGAS)
-
-        self.browser.find_element(By.ID, self.BTN_PESQUISA).clear()
-
-        self.browser.find_element(By.ID, self.BTN_PESQUISA)\
-            .send_keys(str(num_empresa))
-        
-        sleep(3)
-
-        self.browser.find_element(By.ID, self.BTN_FILTRAR).click()
-
+        self.busca_filter(num_empresa, False)
         sleep(3)
 
         return self.extrair_dados(
@@ -209,7 +202,36 @@ class Acessorias:
         return result
 
     def pesquisar_empresa(self, num_empresa):
-        ...
+        self.busca_filter(num_empresa, True)
+        sleep(3)
+
+        nome_emp = self.browser.find_element(By.CSS_SELECTOR, self.POSIC_NOME_EMP.format(num_empresa)).text
+
+        cnpj_emp = self.browser.find_element(By.CSS_SELECTOR, self.POSIC_CNPJ_EMP.format(num_empresa)).text
+
+        return [
+            nome_emp[:nome_emp.rfind('[') - 1],
+            cnpj_emp[:18]
+        ]
+
+    def busca_filter(self, num_empresa, empresa: bool):
+        url = self.URL_ENTREGAS
+        botao = self.BTN_PESQUISA_ENTREGAS
+        if empresa == True:
+            url = self.URL_EMPRESA
+            botao = self.BTN_PESQUISA_EMP
+
+        if self.browser.current_url != url:
+            self.browser.get(url)
+
+        self.browser.find_element(By.ID, botao).clear()
+
+        self.browser.find_element(By.ID, botao)\
+            .send_keys(str(num_empresa))
+        
+        sleep(3)
+
+        self.browser.find_element(By.ID, self.BTN_FILTRAR).click()
 
     def close(self):
         self.browser.close()
@@ -259,7 +281,7 @@ class Wellington(QObject):
             #             listas.append(resp[index])
 
             for num in self.info_matriz:
-                resp = acessorias.pesquisar_entrega(num)
+                resp = self.filtro(acessorias.pesquisar_entrega(num))
                 for index, listas in enumerate(self.obrigacao.values()):
                     listas.append(resp[index])
 
@@ -277,8 +299,9 @@ class Wellington(QObject):
             sleep(20)
             acessorias.close()
 
-    def filtro_obrigacoes(self, lista_obriacoes):
-        ...
+    def filtro(self, lista_obriacoes):
+        print(lista_obriacoes)
+        sleep(20)
 
 class MainWindow(QMainWindow, Ui_MainWindow):
     MAX_PROGRESS = 100
