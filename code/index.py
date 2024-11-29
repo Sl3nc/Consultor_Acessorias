@@ -16,6 +16,7 @@ from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from PySide6.QtWidgets import (
@@ -50,8 +51,8 @@ class Matriz:
     def inserir(self) -> str | None:
         try:
             caminho = askopenfilename()
-            with open(caminho, 'r+'):
-                ...
+            if caminho == '':
+                return None
             self.caminho = self.__validar_entrada(caminho)
             return self.caminho[self.caminho.rfind('/') +1:]
 
@@ -68,9 +69,6 @@ class Matriz:
             return None
 
     def __validar_entrada(self, caminho: str) -> str:
-        # if caminho == '':
-        #     return None
-        
         if caminho[len(caminho) -3 :] != self.tipos_validos:
             ultima_barra = caminho.rfind('/')
             raise Exception(
@@ -92,7 +90,7 @@ class Matriz:
 
     def ler(self) -> list:
         return pd.read_excel(self.caminho, usecols='A', header= None)\
-            .dropna().values.tolist()
+            .iloc[:,0]
 
     def alterar(self, conteudo) -> None:
         #TODO Alterar
@@ -120,8 +118,8 @@ class Matriz:
         os.startfile(self.caminho)
 
 class Acessorias:
-    CHROME_DRIVER_PATH = resource_path('src\\drivers\\chromedriver.exe')
-    URL_MAIN = ''
+    CHROME_DRIVER_PATH = resource_path('src\\driver\\chromedriver.exe')
+    URL_MAIN = 'https://app.acessorias.com/sysmain.php'
     URL_ENTREGAS = 'https://app.acessorias.com/sysmain.php?m=3'
     URL_EMPRESA = 'https://app.acessorias.com/sysmain.php?m=4'
 
@@ -136,7 +134,10 @@ class Acessorias:
     def __init__(self, obrigacoes) -> None:
         self.obrigacoes_desejadas = [i for i in obrigacoes]
 
-        self.browser = self.make_chrome_browser()
+        self.class_status_entrega = "col-sm-3.col-xs-12.no-padding"
+        self.class_nome_entrega = 'neg.brown'
+
+        self.browser = self.make_chrome_browser(hide=False)
         self.browser.get(self.URL_MAIN)
         pass
 
@@ -162,44 +163,67 @@ class Acessorias:
         return browser
     
     def login(self, usuario: str, senha: str):
-        try:
-            self.browser.find_element(By.NAME, self.INPUT_EMAIL).send_keys(usuario)
-            self.browser.find_element(By.NAME, self.INPUT_PASSWORD).send_keys(senha)
+        self.browser.find_element(By.NAME, self.INPUT_EMAIL).send_keys(usuario)
+        self.browser.find_element(By.NAME, self.INPUT_PASSWORD).send_keys(senha)
 
-            self.browser.find_element(By.CSS_SELECTOR, self.BTN_ENTRAR)
+        self.browser.find_element(By.CSS_SELECTOR, self.BTN_ENTRAR).click()
 
-            sleep(10)
-        except:
-            print('Sem Login')
 
-    def pesquisar_entrega(self, num_empresa, competencia):
+    def pesquisar_entrega(self, num_empresa):
         if self.browser.current_url != self.URL_ENTREGAS:
             self.browser.get(self.URL_ENTREGAS)
 
-        self.browser.find_element(By.ID, self.BTN_PESQUISA).send_keys(num_empresa)
+        self.browser.find_element(By.ID, self.BTN_PESQUISA).clear()
+
+        self.browser.find_element(By.ID, self.BTN_PESQUISA)\
+            .send_keys(str(num_empresa))
+        
+        sleep(3)
 
         self.browser.find_element(By.ID, self.BTN_FILTRAR).click()
 
-        sleep(5)
+        sleep(3)
 
-        self.extrir_dados(
+        return self.extrair_dados(
             self.browser.find_element(By.ID, self.TABELA_ENTREGAS)
         )
 
-    def extrir_dados(self, tabela: WebElement):
-        for i in tabela.find_elements(By.CLASS_NAME, 'neg brown'):
-            print(i.text())
+    def extrair_dados(self, tabela: WebElement):
+        result = {}
 
+        nome_competencia = [
+            x.text for x in tabela.find_elements(By.CLASS_NAME, self.class_nome_entrega)
+        ]
+        # print(f'{nome_competencia}\n\n')
+        status = [
+            x.text for x in tabela.find_elements(By.CLASS_NAME, self.class_status_entrega)
+        ]
+        # print(f'{status}\n\n')
+        count = 0
+        for i in range(0, len(nome_competencia), 2):
+            juncao = f'{nome_competencia[i]} {nome_competencia[i + 1]}'
+            result[juncao] = status[count]
+            count = count + 1
+        
+        # print(result)
+        return result
 
     def pesquisar_empresa(self, num_empresa):
         ...
+
+    def close(self):
+        self.browser.close()
 
 class Wellington(QObject):
     valor = Signal(str)
     progress = Signal(int)
     fim = Signal()
 
-    def __init__(self) -> None:
+    def __init__(self, info_matriz: list[str], competencia: str) -> None:
+        super().__init__()
+        self.info_matriz = info_matriz
+        self.competencia = competencia
+
         self.infos_empresa = {
             'Nome': list(),
             'CNPJ': list()
@@ -213,27 +237,48 @@ class Wellington(QObject):
         }
 
         self.credenciais = [
-            json.loads(os.environ['LOGIN']),
-            json.loads(os.environ['SENHA'])
+            os.getenv("LOGIN",""),
+            os.getenv("SENHA",""),
         ]
         pass
 
-    def trabalhar(self, info_matriz: list[str], competencia: str) -> pd.DataFrame:
-        acessorias = Acessorias(self.obrigacao.keys())
-        acessorias.login(self.credenciais[0], self.credenciais[1])
+    #TODO TRABALHAR
+    def trabalhar(self) -> pd.DataFrame:
+        try:
+            acessorias = Acessorias(self.obrigacao.keys())
+            acessorias.login(self.credenciais[0], self.credenciais[1])
+            sleep(5)
 
-        for method, dict_values in {
-            acessorias.pesquisar_entrega: self.obrigacao.values(), 
-            acessorias.pesquisar_empresa: self.infos_empresa.values()
-            }.items():
-            for num in info_matriz:
-                for index, listas in enumerate(dict_values):
-                    listas.append(method(num, competencia)[index])
+            # for method, dict_values in {
+            # acessorias.pesquisar_entrega: self.obrigacao.values(), 
+            # acessorias.pesquisar_empresa: self.infos_empresa.values()
+            # }.items():
+            #     for num in self.info_matriz:
+            #         resp = method(num)
+            #         for index, listas in enumerate(dict_values):
+            #             listas.append(resp[index])
 
-        return pd.DataFrame(
-            self.infos_empresa,
-            self.obrigacao
-        )
+            for num in self.info_matriz:
+                resp = acessorias.pesquisar_entrega(num)
+                for index, listas in enumerate(self.obrigacao.values()):
+                    listas.append(resp[index])
+
+            for num in self.info_matriz:
+                resp = acessorias.pesquisar_empresa(num)
+                for index, listas in enumerate(self.infos_empresa.values()):
+                    listas.append(resp[index])
+
+            return pd.DataFrame(
+                self.infos_empresa,
+                self.obrigacao
+            )
+        except Exception:
+            traceback.print_exc()
+            sleep(20)
+            acessorias.close()
+
+    def filtro_obrigacoes(self, lista_obriacoes):
+        ...
 
 class MainWindow(QMainWindow, Ui_MainWindow):
     MAX_PROGRESS = 100
@@ -264,6 +309,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.pushButton_upload.setText(resp)
             self.pushButton_upload.setIcon(QPixmap(''))
 
+    #TODO HARD_WORK
     def hard_work(self):
         try:
             if self.matriz.envio_invalido():
@@ -273,26 +319,26 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.max_progress_bar = self.MAX_PROGRESS / len(nums_empresas)
 
             self.exec_load(True)
-            self.wellington = Wellington()
+            self.wellington = Wellington(
+                nums_empresas, self.dateEdit_competencia.text()
+            )
             self._thread = QThread()
 
             self.wellington.moveToThread(self._thread)
-            self._thread.started.connect(
-                lambda: self.wellington.trabalhar(
-                    nums_empresas, self.dateEdit_competencia.text())
-                )
+            self._thread.started.connect(self.wellington.trabalhar)
             self.wellington.fim.connect(self._thread.quit)
             self.wellington.fim.connect(self._thread.deleteLater)
             self.wellington.fim.connect(self.encerramento)
             self._thread.finished.connect(self.wellington.deleteLater)
-            self.wellington.valor.connect(self.to_captcha) 
             self.wellington.progress.connect(self.to_progress)
 
             self._thread.start()  
 
         except ParserError:
+            self.exec_load(False)
             messagebox.showerror(title='Aviso', message= 'Erro ao ler o arquivo, certifique-se de ter inserido o arquivo correto')
         except Exception as err:
+            self.exec_load(False)
             traceback.print_exc()
             messagebox.showerror('Aviso', err)
 
@@ -303,19 +349,19 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.matriz.alterar(result)
         self.matriz.abrir()
 
-        self.exec_load(False, 0)
+        self.exec_load(False)
         self.pushButton.setDisabled(False)
 
     def to_progress(self, valor):
         self.progressBar.setValue(self.max_progress_bar * valor)
 
-    def exec_load(self, action: bool, to = 1):
+    def exec_load(self, action: bool):
         if action == True:
             self.movie.start()
-            self.stackedWidget.setCurrentIndex(to)
+            self.stackedWidget.setCurrentIndex(1)
         else:
             self.movie.stop()
-            self.stackedWidget.setCurrentIndex(to)
+            self.stackedWidget.setCurrentIndex(0)
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)

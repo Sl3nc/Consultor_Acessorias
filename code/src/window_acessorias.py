@@ -25,8 +25,8 @@ class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         if not MainWindow.objectName():
             MainWindow.setObjectName(u"MainWindow")
-        MainWindow.resize(778, 525)
-        MainWindow.setMinimumSize(QSize(778, 525))
+        MainWindow.resize(754, 545)
+        MainWindow.setMinimumSize(QSize(754, 545))
         MainWindow.setStyleSheet(u"")
         self.centralwidget = QWidget(MainWindow)
         self.centralwidget.setObjectName(u"centralwidget")
@@ -65,7 +65,7 @@ class Ui_MainWindow(object):
 
         self.logo = QLabel(self.centralwidget)
         self.logo.setObjectName(u"logo")
-        self.logo.setMinimumSize(QSize(580, 108))
+        self.logo.setMinimumSize(QSize(580, 160))
         self.logo.setMaximumSize(QSize(1060, 216))
         self.logo.setPixmap(QPixmap(u"../imgs/acessorias_hori.png"))
         self.logo.setScaledContents(True)
@@ -96,7 +96,7 @@ class Ui_MainWindow(object):
         font1.setItalic(False)
         self.dateEdit_competencia.setFont(font1)
         self.dateEdit_competencia.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.UpDownArrows)
-        self.dateEdit_competencia.setMinimumDateTime(QDateTime(QDate(2024, 9, 14), QTime(3, 0, 0)))
+        self.dateEdit_competencia.setMinimumDateTime(QDateTime(QDate(2024, 9, 14), QTime(0, 0, 0)))
         self.dateEdit_competencia.setMinimumDate(QDate(2024, 9, 14))
         self.dateEdit_competencia.setCurrentSection(QDateTimeEdit.Section.MonthSection)
         self.dateEdit_competencia.setCalendarPopup(False)
@@ -200,6 +200,20 @@ class Ui_MainWindow(object):
 
         self.gridLayout.addItem(self.horizontalSpacer_4, 1, 0, 1, 1)
 
+        self.horizontalSpacer_7 = QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+
+        self.gridLayout.addItem(self.horizontalSpacer_7, 1, 2, 1, 1)
+
+        self.load_movie = QLabel(self.page_load)
+        self.load_movie.setObjectName(u"load_movie")
+        self.load_movie.setMinimumSize(QSize(128, 128))
+        self.load_movie.setMaximumSize(QSize(192, 192))
+        self.load_movie.setPixmap(QPixmap(u"../imgs/load.gif"))
+        self.load_movie.setScaledContents(True)
+        self.load_movie.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.gridLayout.addWidget(self.load_movie, 1, 1, 1, 1)
+
         self.load_title = QLabel(self.page_load)
         self.load_title.setObjectName(u"load_title")
         font7 = QFont()
@@ -211,24 +225,6 @@ class Ui_MainWindow(object):
         self.load_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.gridLayout.addWidget(self.load_title, 2, 1, 1, 1)
-
-        self.horizontalSpacer_7 = QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-
-        self.gridLayout.addItem(self.horizontalSpacer_7, 1, 2, 1, 1)
-
-        self.verticalSpacer_2 = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
-
-        self.gridLayout.addItem(self.verticalSpacer_2, 7, 0, 1, 3)
-
-        self.load_movie = QLabel(self.page_load)
-        self.load_movie.setObjectName(u"load_movie")
-        self.load_movie.setMinimumSize(QSize(128, 128))
-        self.load_movie.setMaximumSize(QSize(256, 256))
-        self.load_movie.setPixmap(QPixmap(u"../imgs/load.gif"))
-        self.load_movie.setScaledContents(True)
-        self.load_movie.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        self.gridLayout.addWidget(self.load_movie, 1, 1, 1, 1)
 
         self.frame_2 = QFrame(self.page_load)
         self.frame_2.setObjectName(u"frame_2")
@@ -248,7 +244,19 @@ class Ui_MainWindow(object):
         self.gridLayout_2.addWidget(self.progressBar, 0, 0, 1, 1)
 
 
-        self.gridLayout.addWidget(self.frame_2, 3, 0, 1, 3)
+        self.gridLayout.addWidget(self.frame_2, 4, 0, 1, 3)
+
+        self.verticalSpacer_2 = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
+
+        self.gridLayout.addItem(self.verticalSpacer_2, 8, 0, 1, 3)
+
+        self.verticalSpacer_3 = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
+
+        self.gridLayout.addItem(self.verticalSpacer_3, 3, 1, 1, 1)
+
+        self.verticalSpacer_4 = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
+
+        self.gridLayout.addItem(self.verticalSpacer_4, 0, 1, 1, 1)
 
         self.stackedWidget.addWidget(self.page_load)
 
@@ -257,7 +265,7 @@ class Ui_MainWindow(object):
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QMenuBar(MainWindow)
         self.menubar.setObjectName(u"menubar")
-        self.menubar.setGeometry(QRect(0, 0, 778, 22))
+        self.menubar.setGeometry(QRect(0, 0, 754, 22))
         MainWindow.setMenuBar(self.menubar)
         self.statusbar = QStatusBar(MainWindow)
         self.statusbar.setObjectName(u"statusbar")
@@ -284,7 +292,7 @@ class Ui_MainWindow(object):
         self.label_matriz.setText(QCoreApplication.translate("MainWindow", u"Arquivo matriz", None))
         self.pushButton_enviar.setText(QCoreApplication.translate("MainWindow", u"Enviar", None))
         self.label_competencia.setText(QCoreApplication.translate("MainWindow", u"Data Compet\u00eancia", None))
-        self.load_title.setText(QCoreApplication.translate("MainWindow", u"Loading...", None))
         self.load_movie.setText("")
+        self.load_title.setText(QCoreApplication.translate("MainWindow", u"Loading...", None))
     # retranslateUi
 
