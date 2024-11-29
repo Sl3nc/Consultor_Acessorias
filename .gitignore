@@ -1,2 +1,5 @@
 /venv
 *.exe
+code/src/__pycache__
+*~
+*.env
