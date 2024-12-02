@@ -100,6 +100,7 @@ class Ui_MainWindow(object):
         self.dateEdit_competencia.setMinimumDate(QDate(2024, 9, 14))
         self.dateEdit_competencia.setCurrentSection(QDateTimeEdit.Section.MonthSection)
         self.dateEdit_competencia.setCalendarPopup(False)
+        self.dateEdit_competencia.setDate(QDate(2024, 10, 15))
 
         self.grid_main.addWidget(self.dateEdit_competencia, 3, 2, 1, 1)
 
@@ -239,7 +240,7 @@ class Ui_MainWindow(object):
         font8.setPointSize(13)
         self.progressBar.setFont(font8)
         self.progressBar.setValue(0)
-        self.progressBar.setTextVisible(False)
+        self.progressBar.setTextVisible(True)
 
         self.gridLayout_2.addWidget(self.progressBar, 0, 0, 1, 1)
 
