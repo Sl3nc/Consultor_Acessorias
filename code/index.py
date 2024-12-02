@@ -4,12 +4,14 @@ import sys
 import traceback
 from unidecode import unidecode
 from time import sleep
+from datetime import datetime, date
 
 import pandas as pd
 from pandas.errors import ParserError
-from openpyxl import load_workbook
+from openpyxl import Workbook
 from openpyxl.cell.text import InlineFont
 from openpyxl.cell.rich_text import TextBlock, CellRichText
+from openpyxl.utils import get_column_letter
 
 from selenium.webdriver.remote.webelement import WebElement
 from selenium import webdriver
@@ -23,14 +25,18 @@ from PySide6.QtWidgets import (
     QMainWindow, QApplication, QWidget, QLabel, QVBoxLayout,QPushButton, QLineEdit
 )
 from PySide6.QtGui import QPixmap, QIcon, QMovie
-from PySide6.QtCore import QThread, QObject, Signal, QSize
+from PySide6.QtCore import QThread, QObject, Signal, QSize, QDate
 from src.window_acessorias import Ui_MainWindow
 
-from tkinter import messagebox
-from tkinter.filedialog import askopenfilename
+from tkinter.messagebox import askyesno, showerror, showinfo
+from tkinter.filedialog import askopenfilename, asksaveasfilename
 
 import json
 from dotenv import load_dotenv
+
+from locale import setlocale, LC_ALL
+
+setlocale(LC_ALL, 'pt_BR.UTF-8')
 
 load_dotenv(Path(__file__).parent / 'src' / 'env' / '.env')
 
@@ -45,7 +51,6 @@ class Matriz:
     def __init__(self) -> None:
         self.tipos_validos = 'lsx'
         self.caminho = None
-        self.COL_TEXT = 12
         pass
 
     def inserir(self) -> str | None:
@@ -57,15 +62,15 @@ class Matriz:
             return self.caminho[self.caminho.rfind('/') +1:]
 
         except PermissionError:
-            messagebox.showerror(title='Aviso', message= 'O arquivo selecionado apresenta-se em aberto em outra janela, favor fecha-la')
+            showerror(title='Aviso', message= 'O arquivo selecionado apresenta-se em aberto em outra janela, favor fecha-la')
             return None
 
         except FileExistsError:
-            messagebox.showerror(title='Aviso', message= 'O arquivo selecionado já apresenta uma versão sem acento, favor usar tal versão ou apagar uma delas')
+            showerror(title='Aviso', message= 'O arquivo selecionado já apresenta uma versão sem acento, favor usar tal versão ou apagar uma delas')
             return None
 
         except Exception as error:
-            messagebox.showerror(title='Aviso', message= error)
+            showerror(title='Aviso', message= error)
             return None
 
     def __validar_entrada(self, caminho: str) -> str:
@@ -92,30 +97,57 @@ class Matriz:
         return pd.read_excel(self.caminho, usecols='A', header= None)\
             .iloc[:,0]
 
-    def alterar(self, conteudo) -> None:
+class Relatorio:
+    NOME_SHEET = 'Relatório'
+
+    def __init__(self) -> None:
+        self.linha_cabecalho = 2
+        self.linha_conteudo = 3
+        pass
+
+    def nomear(self) -> str:
+        nome_arq = asksaveasfilename(title='Favor nomear o arquivo que será salvo', filetypes=((".xlsx","*.xlsx"),))
+
+        if nome_arq == '':
+            if askyesno(title='Aviso', message= 'Deseja cancelar esta operação?') == True:
+                raise Exception ('Operação cancelada!')
+            else:
+                return self.nomear()
+            
+        return nome_arq  + '.xlsx' 
+    
+    def alterar(self, data: pd.DataFrame) -> None:
         #TODO Alterar
-        wb = load_workbook(self.caminho)
-        ws = wb[self.NOME_SHEET]
-        for index, lista_movimentos in enumerate(conteudo.values(), 2):
-            #print(f'{index} - {lista_movimentos}')
-            if lista_movimentos == ['']:
-                continue
+        wb = Workbook()
+        ws = wb.active
+        self.width_ws(ws)
 
-            if ws.cell(index, self.COL_TEXT).value == None:
-                ws.cell(index, self.COL_TEXT, '')
+        self.fill_cabecalho(data, ws)
 
-            s = ' **'.join(str(movimento) for movimento in lista_movimentos\
-                if movimento[:11] not in str(ws.cell(index, self.COL_TEXT).value))
+        self.fill_conteudo(data, ws)
 
-            ws.cell(index, self.COL_TEXT).value = CellRichText(
-                [TextBlock(InlineFont(b=True), s), ws.cell(index, self.COL_TEXT).value]
+        nome_arq = self.nomear()
+        wb.save(nome_arq)
+          
+        showinfo(title='Aviso', message='Abrindo o arquivo gerado!')
+        os.startfile(nome_arq)
+
+    def fill_conteudo(self, conteudo: pd.DataFrame, ws):
+        for index_linha, row in conteudo.iterrows():
+            for index_coluna, valor in enumerate(row, 1):
+                ws.cell(index_linha, index_coluna).value = valor
+
+    def fill_cabecalho(self, conteudo: pd.DataFrame, ws):
+        for index_coluna, column in enumerate(conteudo.columns, 1):
+            ws.cell(self.linha_cabecalho, index_coluna).value = CellRichText(
+                TextBlock(InlineFont(b=True), column)
             )
 
-        wb.save(self.caminho)
-          
-    def abrir(self) -> None:
-        messagebox.showinfo(title='Aviso', message='Abrindo o arquivo gerado!')
-        os.startfile(self.caminho)
+    def width_ws(self, ws):
+        for index, valor in enumerate(
+            [40,20,15,20,15,20,20,20,20,20,20,20], 1
+            ):
+            ws.column_dimensions[get_column_letter(index)].width = valor
 
 class Acessorias:
     CHROME_DRIVER_PATH = resource_path('src\\driver\\chromedriver.exe')
@@ -141,11 +173,11 @@ class Acessorias:
         self.class_status_entrega = "col-sm-3.col-xs-12.no-padding"
         self.class_nome_entrega = 'neg.brown'
 
-        self.browser = self.make_chrome_browser(hide=False)
+        self.browser = self.make_chrome_browser(hide=True)
         self.browser.get(self.URL_MAIN)
         pass
 
-    def make_chrome_browser(self,*options: str, hide = True) -> webdriver.Chrome:
+    def make_chrome_browser(self,*options: str, hide: bool) -> webdriver.Chrome:
         chrome_options = webdriver.ChromeOptions()
 
         if options is not None:
@@ -237,14 +269,15 @@ class Acessorias:
         self.browser.close()
 
 class Wellington(QObject):
-    valor = Signal(str)
     progress = Signal(int)
-    fim = Signal()
+    fim = Signal(pd.DataFrame)
 
     def __init__(self, info_matriz: list[str], competencia: str) -> None:
         super().__init__()
         self.info_matriz = info_matriz
-        self.competencia = competencia
+        self.competencia = datetime.strptime(competencia, '%m/%Y')\
+            .strftime('%b/%Y').title()
+        print(self.competencia)
 
         self.infos_empresa = {
             'Nome': list(),
@@ -252,16 +285,18 @@ class Wellington(QObject):
         }
 
         self.obrigacao = {
-            'FGTS': list(),
-            'PROLABORE': list(),
-            'Resumo de tributos': list(),
-            'Domestico': list(),
+            'GUIA FGTS DIGITAL': list(),
+            'Pro labore': list(),
+            'RESUMO FOLHA DE PAGAMENTO': list(),
+            'BOLETO - HONORÁRIO CONTÁBIL': list(),
         }
 
         self.credenciais = [
             os.getenv("LOGIN",""),
             os.getenv("SENHA",""),
         ]
+
+        self.data_hora = []
         pass
 
     #TODO TRABALHAR
@@ -271,38 +306,43 @@ class Wellington(QObject):
             acessorias.login(self.credenciais[0], self.credenciais[1])
             sleep(5)
 
-            # for method, dict_values in {
-            # acessorias.pesquisar_entrega: self.obrigacao.values(), 
-            # acessorias.pesquisar_empresa: self.infos_empresa.values()
-            # }.items():
-            #     for num in self.info_matriz:
-            #         resp = method(num)
-            #         for index, listas in enumerate(dict_values):
-            #             listas.append(resp[index])
-
+            count = 0
             for num in self.info_matriz:
-                resp = self.filtro(acessorias.pesquisar_entrega(num))
-                for index, listas in enumerate(self.obrigacao.values()):
-                    listas.append(resp[index])
+                self.filtro(acessorias.pesquisar_entrega(num))
+                count = count + 0.5
+                self.progress.emit(count)
 
             for num in self.info_matriz:
                 resp = acessorias.pesquisar_empresa(num)
                 for index, listas in enumerate(self.infos_empresa.values()):
                     listas.append(resp[index])
+                count = count + 0.5
+                self.progress.emit(count)
 
-            return pd.DataFrame(
-                self.infos_empresa,
-                self.obrigacao
-            )
+            print(f'empersa - {self.infos_empresa}\n\n')
+            print(f'obrigação - {self.obrigacao}')
+
+            self.fim.emit((pd.DataFrame(
+                self.infos_empresa | self.obrigacao
+            )))
         except Exception:
             traceback.print_exc()
             sleep(20)
             acessorias.close()
 
-    def filtro(self, lista_obriacoes):
-        print(lista_obriacoes)
-        sleep(20)
-
+    def filtro(self, dict_obriacoes: dict):
+        for obrigacao, lista in self.obrigacao.items():
+            lista.append('Pendente')
+            for key, situacao in dict_obriacoes.items():
+                # print(f'key - {key}')
+                # print(f'competencia - {self.competencia}')
+                # print(f'obrigacao - {obrigacao}')
+                if self.competencia in key and obrigacao in key:
+                    if 'Ent.' in situacao:
+                        lista.pop()
+                        lista.append('Enviado')
+                        break
+            
 class MainWindow(QMainWindow, Ui_MainWindow):
     MAX_PROGRESS = 100
 
@@ -321,6 +361,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.pushButton_upload.setIcon(icon)
         self.movie = QMovie(resource_path("src\\imgs\\load.gif"))
         self.load_movie.setMovie(self.movie)
+        data_atual = datetime.now()
+        self.dateEdit_competencia.setDate(
+            QDate(data_atual.year, data_atual.month - 1, data_atual.day)
+        )
 
         self.pushButton_upload.clicked.connect(self.inserir_arquivo)
         self.pushButton_enviar.clicked.connect(self.hard_work)
@@ -339,7 +383,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 raise Exception('Favor anexar seu relatório de processos')
             
             nums_empresas = self.matriz.ler()
-            self.max_progress_bar = self.MAX_PROGRESS / len(nums_empresas)
+            self.coeficiente_progresso = self.MAX_PROGRESS / len(nums_empresas)
 
             self.exec_load(True)
             self.wellington = Wellington(
@@ -359,24 +403,19 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         except ParserError:
             self.exec_load(False)
-            messagebox.showerror(title='Aviso', message= 'Erro ao ler o arquivo, certifique-se de ter inserido o arquivo correto')
+            showerror(title='Aviso', message= 'Erro ao ler o arquivo, certifique-se de ter inserido o arquivo correto')
         except Exception as err:
             self.exec_load(False)
             traceback.print_exc()
-            messagebox.showerror('Aviso', err)
+            showerror('Aviso', err)
 
-    def encerramento(self, result):
+    def encerramento(self, result: pd.DataFrame):
         #TODO encerramento
-        
-            
-        self.matriz.alterar(result)
-        self.matriz.abrir()
-
+        Relatorio().alterar(result)
         self.exec_load(False)
-        self.pushButton.setDisabled(False)
 
     def to_progress(self, valor):
-        self.progressBar.setValue(self.max_progress_bar * valor)
+        self.progressBar.setValue(self.coeficiente_progresso * valor)
 
     def exec_load(self, action: bool):
         if action == True:
