@@ -98,11 +98,12 @@ class Matriz:
             .iloc[:,0]
 
 class Relatorio:
-    NOME_SHEET = 'Relatório'
+    TITULO = 'Relatório'
 
     def __init__(self) -> None:
         self.linha_cabecalho = 2
         self.linha_conteudo = 3
+        self.espacos_tabela = [50,20,20,10,30,30]
         pass
 
     def nomear(self) -> str:
@@ -135,7 +136,7 @@ class Relatorio:
     def fill_conteudo(self, conteudo: pd.DataFrame, ws):
         for index_linha, row in conteudo.iterrows():
             for index_coluna, valor in enumerate(row, 1):
-                ws.cell(index_linha, index_coluna).value = valor
+                ws.cell(index_linha + self.linha_conteudo, index_coluna).value = valor
 
     def fill_cabecalho(self, conteudo: pd.DataFrame, ws):
         for index_coluna, column in enumerate(conteudo.columns, 1):
@@ -144,9 +145,7 @@ class Relatorio:
             )
 
     def width_ws(self, ws):
-        for index, valor in enumerate(
-            [40,20,15,20,15,20,20,20,20,20,20,20], 1
-            ):
+        for index, valor in enumerate(self.espacos_tabela, 1):
             ws.column_dimensions[get_column_letter(index)].width = valor
 
 class Acessorias:
@@ -277,7 +276,6 @@ class Wellington(QObject):
         self.info_matriz = info_matriz
         self.competencia = datetime.strptime(competencia, '%m/%Y')\
             .strftime('%b/%Y').title()
-        print(self.competencia)
 
         self.infos_empresa = {
             'Nome': list(),
@@ -319,15 +317,14 @@ class Wellington(QObject):
                 count = count + 0.5
                 self.progress.emit(count)
 
-            print(f'empersa - {self.infos_empresa}\n\n')
-            print(f'obrigação - {self.obrigacao}')
+            # print(f'empersa - {self.infos_empresa}\n\n')
+            # print(f'obrigação - {self.obrigacao}')
 
             self.fim.emit((pd.DataFrame(
                 self.infos_empresa | self.obrigacao
             )))
         except Exception:
             traceback.print_exc()
-            sleep(20)
             acessorias.close()
 
     def filtro(self, dict_obriacoes: dict):
