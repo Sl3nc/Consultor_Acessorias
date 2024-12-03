@@ -191,7 +191,7 @@
              </font>
             </property>
             <property name="text">
-             <string>Usuário Acessorias</string>
+             <string>Usuário disponíveis</string>
             </property>
            </widget>
           </item>
@@ -207,6 +207,9 @@
              <font>
               <pointsize>12</pointsize>
              </font>
+            </property>
+            <property name="currentText">
+             <string>Wellington</string>
             </property>
             <item>
              <property name="text">
@@ -316,6 +319,9 @@
                </property>
                <property name="text">
                 <string>Enviar</string>
+               </property>
+               <property name="shortcut">
+                <string>Enter</string>
                </property>
               </widget>
              </item>

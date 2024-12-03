@@ -162,6 +162,9 @@ class Acessorias:
     BTN_PESQUISA_EMP = 'searchString'
     BTN_FILTRAR = 'btFilter'
     TABELA_ENTREGAS = 'divRelEntregas'
+
+    COMPE_DE = 'EntCompDe'
+    COMPE_PARA = 'EntCompAte'
     
     POSIC_NOME_EMP = '#divEmpZ_{0} > div.col-sm-5.col-xs-12.no-padding.aImage > span'
     POSIC_CNPJ_EMP = '#divEmpZ_{0} > div.col-sm-7.col-xs-12.no-padding.aImage > div:nth-child(1)'
@@ -172,7 +175,7 @@ class Acessorias:
         self.class_status_entrega = "col-sm-3.col-xs-12.no-padding"
         self.class_nome_entrega = 'neg.brown'
 
-        self.browser = self.make_chrome_browser(hide=True)
+        self.browser = self.make_chrome_browser(hide=False)
         self.browser.get(self.URL_MAIN)
         pass
 
@@ -204,13 +207,29 @@ class Acessorias:
 
         self.browser.find_element(By.CSS_SELECTOR, self.BTN_ENTRAR).click()
 
-    def pesquisar_entrega(self, num_empresa):
-        self.busca_filter(num_empresa, False)
+    def pesquisar_entrega(self, num_empresa: str, competencia: str):
+        if self.browser.current_url != self.URL_ENTREGAS:
+            self.acessar_entrega(competencia)
+
+        for input in [self.BTN_PESQUISA_ENTREGAS]:
+            self.browser.find_element(By.ID, input).clear()
+            self.browser.find_element(By.ID, input)\
+            .send_keys(num_empresa)
+
+        self.browser.find_element(By.ID, self.BTN_FILTRAR).click()
         sleep(3)
 
         return self.extrair_dados(
             self.browser.find_element(By.ID, self.TABELA_ENTREGAS)
         )
+
+    def acessar_entrega(self, competencia: str):
+        self.browser.get(self.URL_ENTREGAS)
+
+        for input in [self.COMPE_DE, self.COMPE_PARA]:
+            self.browser.find_element(By.ID, input).clear()
+            self.browser.find_element(By.ID, input)\
+            .send_keys(competencia)
 
     def extrair_dados(self, tabela: WebElement):
         result = {}
@@ -218,22 +237,27 @@ class Acessorias:
         nome_competencia = [
             x.text for x in tabela.find_elements(By.CLASS_NAME, self.class_nome_entrega)
         ]
-        # print(f'{nome_competencia}\n\n')
         status = [
             x.text for x in tabela.find_elements(By.CLASS_NAME, self.class_status_entrega)
         ]
-        # print(f'{status}\n\n')
         count = 0
         for i in range(0, len(nome_competencia), 2):
             juncao = f'{nome_competencia[i]} {nome_competencia[i + 1]}'
             result[juncao] = status[count]
             count = count + 1
         
-        # print(result)
         return result
 
     def pesquisar_empresa(self, num_empresa):
-        self.busca_filter(num_empresa, True)
+        if self.browser.current_url != self.URL_EMPRESA:
+            self.browser.get(self.URL_EMPRESA)
+
+        self.browser.find_element(By.ID, self.BTN_PESQUISA_EMP).clear()
+
+        self.browser.find_element(By.ID, self.BTN_PESQUISA_EMP)\
+            .send_keys(str(num_empresa))
+
+        self.browser.find_element(By.ID, self.BTN_FILTRAR).click()
         sleep(3)
 
         nome_emp = self.browser.find_element(By.CSS_SELECTOR, self.POSIC_NOME_EMP.format(num_empresa)).text
@@ -245,37 +269,19 @@ class Acessorias:
             cnpj_emp[:18]
         ]
 
-    def busca_filter(self, num_empresa, empresa: bool):
-        url = self.URL_ENTREGAS
-        botao = self.BTN_PESQUISA_ENTREGAS
-        if empresa == True:
-            url = self.URL_EMPRESA
-            botao = self.BTN_PESQUISA_EMP
-
-        if self.browser.current_url != url:
-            self.browser.get(url)
-
-        self.browser.find_element(By.ID, botao).clear()
-
-        self.browser.find_element(By.ID, botao)\
-            .send_keys(str(num_empresa))
-        
-        sleep(3)
-
-        self.browser.find_element(By.ID, self.BTN_FILTRAR).click()
-
     def close(self):
         self.browser.close()
 
 class Wellington(QObject):
     progress = Signal(int)
-    fim = Signal(pd.DataFrame)
+    fim = Signal()
 
     def __init__(self, info_matriz: list[str], competencia: str) -> None:
         super().__init__()
         self.info_matriz = info_matriz
-        self.competencia = datetime.strptime(competencia, '%m/%Y')\
-            .strftime('%b/%Y').title()
+        self.competencia = competencia
+        # self.competencia_text = datetime.strptime(competencia, '%m/%Y')\
+        #     .strftime('%b/%Y').title()
 
         self.infos_empresa = {
             'Nome': list(),
@@ -306,7 +312,9 @@ class Wellington(QObject):
 
             count = 0
             for num in self.info_matriz:
-                self.filtro(acessorias.pesquisar_entrega(num))
+                self.filtro(acessorias.pesquisar_entrega(
+                    str(num), self.competencia
+                ))
                 count = count + 0.5
                 self.progress.emit(count)
 
@@ -320,9 +328,13 @@ class Wellington(QObject):
             # print(f'empersa - {self.infos_empresa}\n\n')
             # print(f'obrigação - {self.obrigacao}')
 
-            self.fim.emit((pd.DataFrame(
+            Relatorio().alterar(
+                pd.DataFrame(
                 self.infos_empresa | self.obrigacao
-            )))
+                )
+            )
+
+            self.fim.emit()
         except Exception:
             traceback.print_exc()
             acessorias.close()
@@ -331,14 +343,13 @@ class Wellington(QObject):
         for obrigacao, lista in self.obrigacao.items():
             lista.append('Pendente')
             for key, situacao in dict_obriacoes.items():
-                # print(f'key - {key}')
-                # print(f'competencia - {self.competencia}')
-                # print(f'obrigacao - {obrigacao}')
-                if self.competencia in key and obrigacao in key:
+                print(f'\nkey - {key}')
+                print(f'obrigacao - {obrigacao}\n')
+                if obrigacao in key:
                     if 'Ent.' in situacao:
                         lista.pop()
                         lista.append('Enviado')
-                        break
+                    break
             
 class MainWindow(QMainWindow, Ui_MainWindow):
     MAX_PROGRESS = 100
@@ -406,10 +417,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             traceback.print_exc()
             showerror('Aviso', err)
 
-    def encerramento(self, result: pd.DataFrame):
+    def encerramento(self):
         #TODO encerramento
-        Relatorio().alterar(result)
         self.exec_load(False)
+        self.statusbar.showMessage(
+            f'Execução com êxito às {datetime.now().strftime('%H:%M:%S')}', 10)
 
     def to_progress(self, valor):
         self.progressBar.setValue(self.coeficiente_progresso * valor)
