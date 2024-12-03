@@ -209,16 +209,12 @@ class Acessorias:
 
     def pesquisar_entrega(self, num_empresa: str, competencia: str):
         if self.browser.current_url != self.URL_ENTREGAS:
-            self.browser.get(self.URL_ENTREGAS)
+            self.acessar_entrega(competencia)
 
-        for input, valor in {
-            self.BTN_PESQUISA_ENTREGAS: num_empresa,
-            self.COMPE_DE: competencia,
-            self.COMPE_PARA: competencia
-            }.items():
+        for input in [self.BTN_PESQUISA_ENTREGAS]:
             self.browser.find_element(By.ID, input).clear()
             self.browser.find_element(By.ID, input)\
-            .send_keys(valor)
+            .send_keys(num_empresa)
 
         self.browser.find_element(By.ID, self.BTN_FILTRAR).click()
         sleep(3)
@@ -226,6 +222,14 @@ class Acessorias:
         return self.extrair_dados(
             self.browser.find_element(By.ID, self.TABELA_ENTREGAS)
         )
+
+    def acessar_entrega(self, competencia: str):
+        self.browser.get(self.URL_ENTREGAS)
+
+        for input in [self.COMPE_DE, self.COMPE_PARA]:
+            self.browser.find_element(By.ID, input).clear()
+            self.browser.find_element(By.ID, input)\
+            .send_keys(competencia)
 
     def extrair_dados(self, tabela: WebElement):
         result = {}
@@ -270,13 +274,14 @@ class Acessorias:
 
 class Wellington(QObject):
     progress = Signal(int)
-    fim = Signal(pd.DataFrame)
+    fim = Signal()
 
     def __init__(self, info_matriz: list[str], competencia: str) -> None:
         super().__init__()
         self.info_matriz = info_matriz
-        self.competencia = datetime.strptime(competencia, '%m/%Y')\
-            .strftime('%b/%Y').title()
+        self.competencia = competencia
+        # self.competencia_text = datetime.strptime(competencia, '%m/%Y')\
+        #     .strftime('%b/%Y').title()
 
         self.infos_empresa = {
             'Nome': list(),
@@ -323,9 +328,13 @@ class Wellington(QObject):
             # print(f'empersa - {self.infos_empresa}\n\n')
             # print(f'obrigação - {self.obrigacao}')
 
-            self.fim.emit((pd.DataFrame(
+            Relatorio().alterar(
+                pd.DataFrame(
                 self.infos_empresa | self.obrigacao
-            )))
+                )
+            )
+
+            self.fim.emit()
         except Exception:
             traceback.print_exc()
             acessorias.close()
@@ -340,7 +349,7 @@ class Wellington(QObject):
                     if 'Ent.' in situacao:
                         lista.pop()
                         lista.append('Enviado')
-                        break
+                    break
             
 class MainWindow(QMainWindow, Ui_MainWindow):
     MAX_PROGRESS = 100
@@ -408,9 +417,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             traceback.print_exc()
             showerror('Aviso', err)
 
-    def encerramento(self, result: pd.DataFrame):
+    def encerramento(self):
         #TODO encerramento
-        Relatorio().alterar(result)
         self.exec_load(False)
         self.statusbar.showMessage(
             f'Execução com êxito às {datetime.now().strftime('%H:%M:%S')}', 10)
