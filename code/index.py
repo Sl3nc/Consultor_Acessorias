@@ -47,8 +47,12 @@ def resource_path(relative_path):
         os.path.dirname(os.path.abspath(__file__)))
     return os.path.join(base_path, relative_path)
 
-class Matriz:
+class Matriz(object):
+    fim = Signal(dict)
+    qnt_empresas = Signal(int)
+
     def __init__(self) -> None:
+        super().__init__()
         self.tipos_validos = 'lsx'
         self.caminho = None
         self.planilha_excecoes = ['PORCENTAGEM', 'PERCENTUAIS']
@@ -99,10 +103,11 @@ class Matriz:
         nomes_planilha = load_workbook(self.caminho).sheetnames
         for i in self.planilha_excecoes:
             nomes_planilha.remove(i)
-        print(nomes_planilha)
+
         for nome in nomes_planilha:
-            result[nome] = pd.read_excel(self.caminho, usecols='A', header= None, sheet_name= nome).dropna().iloc[:, 0]
-        return result
+            result[nome] = [int(i) for i in pd.read_excel(self.caminho, usecols='A', header= None, sheet_name= nome).dropna().iloc[:, 0]]
+
+        self.fim.emit(result)
 
 class Relatorio:
     TITULO = 'Relatório'
@@ -383,7 +388,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         )
 
         self.pushButton_upload.clicked.connect(self.inserir_arquivo)
-        self.pushButton_enviar.clicked.connect(self.hard_work)
+        self.pushButton_enviar.clicked.connect(self.ler_matriz)
 
     def inserir_arquivo(self):
         resp = self.matriz.inserir()
@@ -392,14 +397,29 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.pushButton_upload.setText(resp)
             self.pushButton_upload.setIcon(QPixmap(''))
 
+    def ler_matriz(self):
+        if self.matriz.envio_invalido():
+            raise Exception('Favor anexar seu relatório de processos')
+         
+        self.exec_load(True)
+        self._thread = QThread()
+
+        self.matriz.moveToThread(self._thread)
+        self._thread.started.connect(self.matriz.ler)
+        self.matriz.fim.connect(self._thread.quit)
+        self.matriz.fim.connect(self._thread.deleteLater)
+        self.matriz.fim.connect(self.hard_work)
+        self._thread.finished.connect(self.matriz.deleteLater)
+        self.matriz.qnt_empresas.connect(self.set_progress)
+
+        self._thread.start()  
+
     #TODO HARD_WORK
-    def hard_work(self):
+    def hard_work(self, itens_matriz: dict):
         try:
-            if self.matriz.envio_invalido():
-                raise Exception('Favor anexar seu relatório de processos')
-            
-            obrigacoes = self.matriz.ler()
-            print(obrigacoes)
+                    
+            for key, value in itens_matriz.items():
+                print(f'{key} - {value}')
             # self.coeficiente_progresso = self.MAX_PROGRESS / self.num_empresas(obrigacoes)
 
             # self.exec_load(True)
@@ -431,6 +451,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.exec_load(False)
         self.statusbar.showMessage(
             f'Execução com êxito às {datetime.now().strftime('%H:%M:%S')}', 10)
+        
+    def set_progress(self, valor):
+        self.coeficiente_progresso = self.MAX_PROGRESS / valor
 
     def to_progress(self, valor):
         self.progressBar.setValue(self.coeficiente_progresso * valor)
