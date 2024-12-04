@@ -8,7 +8,7 @@ from datetime import datetime, date
 
 import pandas as pd
 from pandas.errors import ParserError
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 from openpyxl.cell.text import InlineFont
 from openpyxl.cell.rich_text import TextBlock, CellRichText
 from openpyxl.utils import get_column_letter
@@ -51,6 +51,7 @@ class Matriz:
     def __init__(self) -> None:
         self.tipos_validos = 'lsx'
         self.caminho = None
+        self.planilha_excecoes = ['PORCENTAGEM', 'PERCENTUAIS']
         pass
 
     def inserir(self) -> str | None:
@@ -93,9 +94,15 @@ class Matriz:
     def envio_invalido(self) -> bool:
         return True if self.caminho == None else False
 
-    def ler(self) -> list:
-        return pd.read_excel(self.caminho, usecols='A', header= None)\
-            .iloc[:,0]
+    def ler(self) -> dict[str,list[str]]:
+        result = {}
+        nomes_planilha = load_workbook(self.caminho).sheetnames
+        for i in self.planilha_excecoes:
+            nomes_planilha.remove(i)
+        print(nomes_planilha)
+        for nome in nomes_planilha:
+            result[nome] = pd.read_excel(self.caminho, usecols='A', header= None, sheet_name= nome).dropna().iloc[:, 0]
+        return result
 
 class Relatorio:
     TITULO = 'Relatório'
@@ -280,27 +287,28 @@ class Wellington(QObject):
         super().__init__()
         self.info_matriz = info_matriz
         self.competencia = competencia
-        # self.competencia_text = datetime.strptime(competencia, '%m/%Y')\
-        #     .strftime('%b/%Y').title()
 
         self.infos_empresa = {
             'Nome': list(),
             'CNPJ': list()
         }
 
-        self.obrigacao = {
-            'GUIA FGTS DIGITAL': list(),
-            'Pro labore': list(),
-            'RESUMO FOLHA DE PAGAMENTO': list(),
-            'BOLETO - HONORÁRIO CONTÁBIL': list(),
+        self.obrigacoes = {
+
         }
+
+        # self.obrigacao = {
+        #     'GUIA FGTS DIGITAL': list(),
+        #     'Pro labore': list(),
+        #     'RESUMO FOLHA DE PAGAMENTO': list(),
+        #     'BOLETO - HONORÁRIO CONTÁBIL': list(),
+        # }
 
         self.credenciais = [
             os.getenv("LOGIN",""),
             os.getenv("SENHA",""),
         ]
 
-        self.data_hora = []
         pass
 
     #TODO TRABALHAR
@@ -348,7 +356,7 @@ class Wellington(QObject):
                 if obrigacao in key:
                     if 'Ent.' in situacao:
                         lista.pop()
-                        lista.append('Enviado')
+                        lista.append(f'Enviado: {situacao}')
                     break
             
 class MainWindow(QMainWindow, Ui_MainWindow):
@@ -390,24 +398,25 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             if self.matriz.envio_invalido():
                 raise Exception('Favor anexar seu relatório de processos')
             
-            nums_empresas = self.matriz.ler()
-            self.coeficiente_progresso = self.MAX_PROGRESS / len(nums_empresas)
+            obrigacoes = self.matriz.ler()
+            print(obrigacoes)
+            # self.coeficiente_progresso = self.MAX_PROGRESS / self.num_empresas(obrigacoes)
 
-            self.exec_load(True)
-            self.wellington = Wellington(
-                nums_empresas, self.dateEdit_competencia.text()
-            )
-            self._thread = QThread()
+            # self.exec_load(True)
+            # self.wellington = Wellington(
+            #     obrigacoes, self.dateEdit_competencia.text()
+            # )
+            # self._thread = QThread()
 
-            self.wellington.moveToThread(self._thread)
-            self._thread.started.connect(self.wellington.trabalhar)
-            self.wellington.fim.connect(self._thread.quit)
-            self.wellington.fim.connect(self._thread.deleteLater)
-            self.wellington.fim.connect(self.encerramento)
-            self._thread.finished.connect(self.wellington.deleteLater)
-            self.wellington.progress.connect(self.to_progress)
+            # self.wellington.moveToThread(self._thread)
+            # self._thread.started.connect(self.wellington.trabalhar)
+            # self.wellington.fim.connect(self._thread.quit)
+            # self.wellington.fim.connect(self._thread.deleteLater)
+            # self.wellington.fim.connect(self.encerramento)
+            # self._thread.finished.connect(self.wellington.deleteLater)
+            # self.wellington.progress.connect(self.to_progress)
 
-            self._thread.start()  
+            # self._thread.start()  
 
         except ParserError:
             self.exec_load(False)
