@@ -47,7 +47,7 @@ def resource_path(relative_path):
         os.path.dirname(os.path.abspath(__file__)))
     return os.path.join(base_path, relative_path)
 
-class Matriz(object):
+class Matriz(QObject):
     fim = Signal(dict)
     qnt_empresas = Signal(int)
 
@@ -103,6 +103,7 @@ class Matriz(object):
         nomes_planilha = load_workbook(self.caminho).sheetnames
         for i in self.planilha_excecoes:
             nomes_planilha.remove(i)
+        self.qnt_empresas.emit(len(nomes_planilha))
 
         for nome in nomes_planilha:
             result[nome] = [int(i) for i in pd.read_excel(self.caminho, usecols='A', header= None, sheet_name= nome).dropna().iloc[:, 0]]
@@ -130,7 +131,6 @@ class Relatorio:
         return nome_arq  + '.xlsx' 
     
     def alterar(self, data: pd.DataFrame) -> None:
-        #TODO Alterar
         wb = Workbook()
         ws = wb.active
         self.width_ws(ws)
@@ -212,7 +212,6 @@ class Acessorias:
 
         return browser
     
-    #TODO ACESSORIAS
     def login(self, usuario: str, senha: str):
         self.browser.find_element(By.NAME, self.INPUT_EMAIL).send_keys(usuario)
         self.browser.find_element(By.NAME, self.INPUT_PASSWORD).send_keys(senha)
@@ -284,13 +283,34 @@ class Acessorias:
     def close(self):
         self.browser.close()
 
+class Obrigacoes:
+    def __init__(self) -> None:
+        self.interesses = {}
+        pass
+
+    def add_dados(self, dict_obriacoes: dict):
+        for obrigacao, lista in self.obrigacao.items():
+            lista.append('Pendente')
+            for key, situacao in dict_obriacoes.items():
+                print(f'\nkey - {key}')
+                print(f'obrigacao - {obrigacao}\n')
+                if obrigacao in key:
+                    if 'Ent.' in situacao:
+                        lista.pop()
+                        lista.append(f'Enviado: {situacao}')
+                    break
+
+    def result(self):
+        return pd.DataFrame(self.interesses)
+
+#TODO WELLINGTON
 class Wellington(QObject):
     progress = Signal(int)
     fim = Signal()
 
-    def __init__(self, info_matriz: list[str], competencia: str) -> None:
+    def __init__(self, itens_matriz: dict[str,list[str]], competencia: str) -> None:
         super().__init__()
-        self.info_matriz = info_matriz
+        self.info_matriz = itens_matriz
         self.competencia = competencia
 
         self.infos_empresa = {
@@ -323,6 +343,7 @@ class Wellington(QObject):
             acessorias.login(self.credenciais[0], self.credenciais[1])
             sleep(5)
 
+            #Implementar procura pela obrigação e adição de dados ao mesmo
             count = 0
             for num in self.info_matriz:
                 self.filtro(acessorias.pesquisar_entrega(
@@ -351,18 +372,6 @@ class Wellington(QObject):
         except Exception:
             traceback.print_exc()
             acessorias.close()
-
-    def filtro(self, dict_obriacoes: dict):
-        for obrigacao, lista in self.obrigacao.items():
-            lista.append('Pendente')
-            for key, situacao in dict_obriacoes.items():
-                print(f'\nkey - {key}')
-                print(f'obrigacao - {obrigacao}\n')
-                if obrigacao in key:
-                    if 'Ent.' in situacao:
-                        lista.pop()
-                        lista.append(f'Enviado: {situacao}')
-                    break
             
 class MainWindow(QMainWindow, Ui_MainWindow):
     MAX_PROGRESS = 100
@@ -370,7 +379,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self, parent = None):
         super().__init__(parent)
         self.setupUi(self)
-
         self.matriz = Matriz()
 
         self.setWindowIcon((QIcon(
@@ -401,7 +409,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if self.matriz.envio_invalido():
             raise Exception('Favor anexar seu relatório de processos')
          
+        self.load_title.setText('Carregando empresas da matriz...')
+        self.progressBar.hide()
         self.exec_load(True)
+
         self._thread = QThread()
 
         self.matriz.moveToThread(self._thread)
@@ -417,26 +428,26 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     #TODO HARD_WORK
     def hard_work(self, itens_matriz: dict):
         try:
-                    
-            for key, value in itens_matriz.items():
-                print(f'{key} - {value}')
-            # self.coeficiente_progresso = self.MAX_PROGRESS / self.num_empresas(obrigacoes)
+            self.load_title.setText('Pesquisando empresas...')
+            self.progressBar.show()
 
-            # self.exec_load(True)
-            # self.wellington = Wellington(
-            #     obrigacoes, self.dateEdit_competencia.text()
-            # )
-            # self._thread = QThread()
+            # for key, value in itens_matriz.items():
+            #     print(f'{key} - {value}')
 
-            # self.wellington.moveToThread(self._thread)
-            # self._thread.started.connect(self.wellington.trabalhar)
-            # self.wellington.fim.connect(self._thread.quit)
-            # self.wellington.fim.connect(self._thread.deleteLater)
-            # self.wellington.fim.connect(self.encerramento)
-            # self._thread.finished.connect(self.wellington.deleteLater)
-            # self.wellington.progress.connect(self.to_progress)
+            self.wellington = Wellington(
+                itens_matriz, self.dateEdit_competencia.text()
+            )
+            self._thread = QThread()
 
-            # self._thread.start()  
+            self.wellington.moveToThread(self._thread)
+            self._thread.started.connect(self.wellington.trabalhar)
+            self.wellington.fim.connect(self._thread.quit)
+            self.wellington.fim.connect(self._thread.deleteLater)
+            self.wellington.fim.connect(self.encerramento)
+            self._thread.finished.connect(self.wellington.deleteLater)
+            self.wellington.progress.connect(self.to_progress)
+
+            self._thread.start()  
 
         except ParserError:
             self.exec_load(False)
@@ -447,15 +458,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             showerror('Aviso', err)
 
     def encerramento(self):
-        #TODO encerramento
         self.exec_load(False)
         self.statusbar.showMessage(
             f'Execução com êxito às {datetime.now().strftime('%H:%M:%S')}', 10)
         
     def set_progress(self, valor):
+        print(valor)
         self.coeficiente_progresso = self.MAX_PROGRESS / valor
 
-    def to_progress(self, valor):
+    def add_progress(self, valor):
         self.progressBar.setValue(self.coeficiente_progresso * valor)
 
     def exec_load(self, action: bool):

@@ -207,6 +207,11 @@ class Ui_MainWindow(object):
 
         self.load_movie = QLabel(self.page_load)
         self.load_movie.setObjectName(u"load_movie")
+        sizePolicy2 = QSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Maximum)
+        sizePolicy2.setHorizontalStretch(0)
+        sizePolicy2.setVerticalStretch(0)
+        sizePolicy2.setHeightForWidth(self.load_movie.sizePolicy().hasHeightForWidth())
+        self.load_movie.setSizePolicy(sizePolicy2)
         self.load_movie.setMinimumSize(QSize(128, 128))
         self.load_movie.setMaximumSize(QSize(192, 192))
         self.load_movie.setPixmap(QPixmap(u"../imgs/load.gif"))
@@ -214,18 +219,6 @@ class Ui_MainWindow(object):
         self.load_movie.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.gridLayout.addWidget(self.load_movie, 1, 1, 1, 1)
-
-        self.load_title = QLabel(self.page_load)
-        self.load_title.setObjectName(u"load_title")
-        font7 = QFont()
-        font7.setFamilies([u"Yu Gothic UI"])
-        font7.setPointSize(18)
-        font7.setBold(False)
-        font7.setItalic(True)
-        self.load_title.setFont(font7)
-        self.load_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        self.gridLayout.addWidget(self.load_title, 2, 1, 1, 1)
 
         self.frame_2 = QFrame(self.page_load)
         self.frame_2.setObjectName(u"frame_2")
@@ -236,9 +229,9 @@ class Ui_MainWindow(object):
         self.gridLayout_2.setContentsMargins(75, -1, 75, -1)
         self.progressBar = QProgressBar(self.frame_2)
         self.progressBar.setObjectName(u"progressBar")
-        font8 = QFont()
-        font8.setPointSize(13)
-        self.progressBar.setFont(font8)
+        font7 = QFont()
+        font7.setPointSize(13)
+        self.progressBar.setFont(font7)
         self.progressBar.setValue(0)
         self.progressBar.setTextVisible(True)
 
@@ -258,6 +251,18 @@ class Ui_MainWindow(object):
         self.verticalSpacer_4 = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
 
         self.gridLayout.addItem(self.verticalSpacer_4, 0, 1, 1, 1)
+
+        self.load_title = QLabel(self.page_load)
+        self.load_title.setObjectName(u"load_title")
+        font8 = QFont()
+        font8.setFamilies([u"Yu Gothic UI"])
+        font8.setPointSize(18)
+        font8.setBold(False)
+        font8.setItalic(True)
+        self.load_title.setFont(font8)
+        self.load_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.gridLayout.addWidget(self.load_title, 2, 0, 1, 3)
 
         self.stackedWidget.addWidget(self.page_load)
 
@@ -286,12 +291,16 @@ class Ui_MainWindow(object):
         self.titulo.setText(QCoreApplication.translate("MainWindow", u"Consultor Acessorias", None))
         self.logo.setText("")
         self.dateEdit_competencia.setDisplayFormat(QCoreApplication.translate("MainWindow", u"MM/yyyy", None))
-        self.label_usuario.setText(QCoreApplication.translate("MainWindow", u"Usu\u00e1rio Acessorias", None))
+        self.label_usuario.setText(QCoreApplication.translate("MainWindow", u"Usu\u00e1rio dispon\u00edveis", None))
         self.comboBox_usuario.setItemText(0, QCoreApplication.translate("MainWindow", u"Wellington", None))
 
+        self.comboBox_usuario.setCurrentText(QCoreApplication.translate("MainWindow", u"Wellington", None))
         self.pushButton_upload.setText(QCoreApplication.translate("MainWindow", u" Upload", None))
         self.label_matriz.setText(QCoreApplication.translate("MainWindow", u"Arquivo matriz", None))
         self.pushButton_enviar.setText(QCoreApplication.translate("MainWindow", u"Enviar", None))
+#if QT_CONFIG(shortcut)
+        self.pushButton_enviar.setShortcut(QCoreApplication.translate("MainWindow", u"Enter", None))
+#endif // QT_CONFIG(shortcut)
         self.label_competencia.setText(QCoreApplication.translate("MainWindow", u"Data Compet\u00eancia", None))
         self.load_movie.setText("")
         self.load_title.setText(QCoreApplication.translate("MainWindow", u"Loading...", None))
