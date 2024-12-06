@@ -51,6 +51,11 @@ class Obrigacao:
     def __init__(self, interesses: list) -> None:
         self.interesses = {key: list() for key in interesses}
 
+        self.infos_empresa = {
+            'Nome': list(),
+            'CNPJ': list()
+        }
+
         # self.obrigacao = {
         #     'GUIA FGTS DIGITAL': list(),
         #     'Pro labore': list(),
@@ -63,16 +68,20 @@ class Obrigacao:
         for interesse, lista in self.interesses.items():
             lista.append('Pendente')
             for key, situacao in dict_obriacoes.items():
-                print(f'\nkey - {key}')
-                print(f'interesse - {interesse}\n')
+                # print(f'\nkey - {key}')
+                # print(f'interesse - {interesse}\n')
                 if interesse in key:
                     if 'Ent.' in situacao:
                         lista.pop()
                         lista.append(f'Enviado: {situacao}')
                     break
 
+    def add_empresa(self, infos_emp: list[str]):
+        for index, listas in enumerate(self.infos_empresa.values()):
+            listas.append(infos_emp[index])
+
     def result(self):
-        return pd.DataFrame(self.interesses)
+        return pd.DataFrame(self.infos_empresa | self.interesses)
 
 class Matriz(QObject):
     fim = Signal(dict)
@@ -129,7 +138,8 @@ class Matriz(QObject):
         result = {}
         nomes_planilha = load_workbook(self.caminho).sheetnames
         for i in self.planilha_excecoes:
-            nomes_planilha.remove(i)
+            if i in nomes_planilha:
+                nomes_planilha.remove(i)
         self.qnt_empresas.emit(len(nomes_planilha))
 
         for nome in nomes_planilha:
@@ -207,6 +217,7 @@ class Acessorias:
     COMPE_PARA = 'EntCompAte'
     
     POSIC_NOME_EMP = '#divEmpZ_{0} > div.col-sm-5.col-xs-12.no-padding.aImage > span'
+
     POSIC_CNPJ_EMP = '#divEmpZ_{0} > div.col-sm-7.col-xs-12.no-padding.aImage > div:nth-child(1)'
 
     def __init__(self) -> None:
@@ -244,9 +255,9 @@ class Acessorias:
 
         self.browser.find_element(By.CSS_SELECTOR, self.BTN_ENTRAR).click()
 
-    def pesquisar_entrega(self, num_empresa: str, competencia: str):
+    def pesquisar_entrega(self, num_empresa: str):
         if self.browser.current_url != self.URL_ENTREGAS:
-            self.acessar_entrega(competencia)
+            self.browser.get(self.URL_ENTREGAS)
 
         for input in [self.BTN_PESQUISA_ENTREGAS]:
             self.browser.find_element(By.ID, input).clear()
@@ -260,7 +271,7 @@ class Acessorias:
             self.browser.find_element(By.ID, self.TABELA_ENTREGAS)
         )
 
-    def acessar_entrega(self, competencia: str):
+    def set_competencia(self, competencia: str):
         self.browser.get(self.URL_ENTREGAS)
 
         for input in [self.COMPE_DE, self.COMPE_PARA]:
@@ -285,26 +296,33 @@ class Acessorias:
         
         return result
 
-    def pesquisar_empresa(self, num_empresa):
-        if self.browser.current_url != self.URL_EMPRESA:
-            self.browser.get(self.URL_EMPRESA)
+    def pesquisar_empresa(self, num_empresa: str):
+        try:
+            if self.browser.current_url != self.URL_EMPRESA:
+                self.browser.get(self.URL_EMPRESA)
 
-        self.browser.find_element(By.ID, self.BTN_PESQUISA_EMP).clear()
+            self.browser.find_element(By.ID, self.BTN_PESQUISA_EMP).clear()
 
-        self.browser.find_element(By.ID, self.BTN_PESQUISA_EMP)\
-            .send_keys(str(num_empresa))
+            self.browser.find_element(By.ID, self.BTN_PESQUISA_EMP)\
+                .send_keys(num_empresa)
 
-        self.browser.find_element(By.ID, self.BTN_FILTRAR).click()
-        sleep(3)
+            self.browser.find_element(By.ID, self.BTN_FILTRAR).click()
+            sleep(3)
 
-        nome_emp = self.browser.find_element(By.CSS_SELECTOR, self.POSIC_NOME_EMP.format(num_empresa)).text
+            nome_emp = self.browser.find_element(By.CSS_SELECTOR, self.POSIC_NOME_EMP.format(num_empresa)).text
 
-        cnpj_emp = self.browser.find_element(By.CSS_SELECTOR, self.POSIC_CNPJ_EMP.format(num_empresa)).text
+            cnpj_emp = self.browser.find_element(By.CSS_SELECTOR, self.POSIC_CNPJ_EMP.format(num_empresa)).text
 
-        return [
-            nome_emp[:nome_emp.rfind('[') - 1],
-            cnpj_emp[:18]
-        ]
+            return [
+                nome_emp[:nome_emp.rfind('[') - 1],
+                cnpj_emp[:18]
+            ]
+        except:
+            return [
+                'Empresa não encontrada',
+                'Num. domínio: '+ num_empresa
+            ]
+
 
     def close(self):
         self.browser.close()
@@ -318,11 +336,6 @@ class Wellington(QObject):
         super().__init__()
         self.info_matriz = itens_matriz
         self.competencia = competencia
-
-        self.infos_empresa = {
-            'Nome': list(),
-            'CNPJ': list()
-        }
 
         self.obrigacoes = {
             'SO PRO LABORE': Obrigacao(
@@ -354,26 +367,18 @@ class Wellington(QObject):
 
             #Implementar procura pela obrigação e adição de dados ao mesmo
             count = 0
+            acessorias.set_competencia(self.competencia)
             for categoria_matriz, list_num in self.info_matriz.items():
+                print(categoria_matriz + '-'*40)
                 for categoria_obri, obrigacao in self.obrigacoes.items():
+                    print(categoria_matriz + '-'*40)
                     if categoria_matriz == categoria_obri:
                         for num in list_num:
-                            obrigacao.add_dados(acessorias.pesquisar_entrega(
-                                str(num), self.competencia
-                            ))
+                            obrigacao.add_dados(acessorias.pesquisar_entrega(str(num)))
+                            obrigacao.add_empresa(acessorias.pesquisar_empresa(str(num)))
                         break
                 count = count + 1
                 self.progress.emit(count)
-
-            for num in self.info_matriz:
-                resp = acessorias.pesquisar_empresa(num)
-                for index, listas in enumerate(self.infos_empresa.values()):
-                    listas.append(resp[index])
-                count = count + 0.5
-                self.progress.emit(count)
-
-            # print(f'empersa - {self.infos_empresa}\n\n')
-            # print(f'obrigação - {self.obrigacao}')
 
             Relatorio().alterar(self.obrigacoes)
             self.fim.emit()
@@ -471,7 +476,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             f'Execução com êxito às {datetime.now().strftime('%H:%M:%S')}', 10)
         
     def set_progress(self, valor):
-        print(valor)
         self.coeficiente_progresso = self.MAX_PROGRESS / valor
 
     def add_progress(self, valor):
