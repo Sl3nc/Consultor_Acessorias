@@ -134,7 +134,7 @@ class Matriz(QObject):
     def envio_invalido(self) -> bool:
         return True if self.caminho == None else False
 
-    def ler(self) -> dict[str,list[str]]:
+    def ler(self) -> dict[str,list[int]]:
         result = {}
         nomes_planilha = load_workbook(self.caminho).sheetnames
         for i in self.planilha_excecoes:
@@ -143,10 +143,9 @@ class Matriz(QObject):
 
         count = 0
         for nome in nomes_planilha:
-            result[nome] = [str(i) for i in pd.read_excel(self.caminho, usecols='A', header= None, sheet_name= nome).dropna().iloc[:, 0]]
+            result[nome] = [int(i) for i in pd.read_excel(self.caminho, usecols='A', header= None, sheet_name= nome).dropna().iloc[:, 0] if str(i)[0].isnumeric() == True]
             count = len(result[nome]) + count
         self.qnt_empresas.emit(count)
-
         self.fim.emit(result)
 
 class Relatorio:
@@ -266,7 +265,7 @@ class Acessorias:
         for input in [self.BTN_PESQUISA_ENTREGAS]:
             self.browser.find_element(By.ID, input).clear()
             self.browser.find_element(By.ID, input)\
-            .send_keys(num_empresa)
+            .send_keys(str(num_empresa))
 
         self.browser.find_element(By.ID, self.BTN_FILTRAR).click()
         sleep(3)
@@ -324,7 +323,7 @@ class Acessorias:
         except:
             return [
                 'Empresa não encontrada',
-                'Num. domínio: '+ num_empresa
+                'Num. domínio: '+ str(num_empresa)
             ]
 
 
@@ -336,12 +335,15 @@ class Wellington(QObject):
     progress = Signal(int)
     fim = Signal()
 
-    def __init__(self, itens_matriz: dict[str,list[str]], competencia: str) -> None:
+    def __init__(self, itens_matriz: dict[str,list[int]], competencia: str) -> None:
         super().__init__()
         self.info_matriz = itens_matriz
         self.competencia = competencia
 
         self.obrigacoes = {
+            'DOMESTICO': Obrigacao(
+                ['Recibo de Pagamento de Salário','GUIA E-SOCIAL - EMPREGADOR','FOLHA DE PONTO']
+            ),
             'SO PRO LABORE': Obrigacao(
                 ['RESUMO FOLHA DE PAGAMENTO','DARF DCTFWEB','RECIBO DCTFWEB','ESOCIAL']
             ),
@@ -352,7 +354,6 @@ class Wellington(QObject):
                 ['RESUMO FOLHA DE PAGAMENTO','DARF','RECIBO DCTFWEB','ESOCIAL','GUIA FGTS DIGITAL','RELATORIO FGTS DIGITAL']
             ),
             'SEM MOVIMENTO': Obrigacao(['DARF DCTFWEB','RECIBO DCTFWEB','ESOCIAL']),
-            # 'SO DCTF': Obrigacao([''])
         }
 
         self.credenciais = [
