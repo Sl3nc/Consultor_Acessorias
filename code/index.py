@@ -140,10 +140,12 @@ class Matriz(QObject):
         for i in self.planilha_excecoes:
             if i in nomes_planilha:
                 nomes_planilha.remove(i)
-        self.qnt_empresas.emit(len(nomes_planilha))
 
+        count = 0
         for nome in nomes_planilha:
-            result[nome] = [int(i) for i in pd.read_excel(self.caminho, usecols='A', header= None, sheet_name= nome).dropna().iloc[:, 0]]
+            result[nome] = [str(i) for i in pd.read_excel(self.caminho, usecols='A', header= None, sheet_name= nome).dropna().iloc[:, 0]]
+            count = len(result[nome]) + count
+        self.qnt_empresas.emit(count)
 
         self.fim.emit(result)
 
@@ -153,7 +155,7 @@ class Relatorio:
     def __init__(self) -> None:
         self.linha_cabecalho = 2
         self.linha_conteudo = 3
-        self.espacos_tabela = [50,30,30,30,30,30]
+        self.espacos_tabela = [50,30,30,30,30,30,30,30]
         pass
 
     def nomear(self) -> str:
@@ -376,9 +378,10 @@ class Wellington(QObject):
                         for num in list_num:
                             obrigacao.add_dados(acessorias.pesquisar_entrega(str(num)))
                             obrigacao.add_empresa(acessorias.pesquisar_empresa(str(num)))
+
+                            count = count + 1
+                            self.progress.emit(count)
                         break
-                count = count + 1
-                self.progress.emit(count)
 
             acessorias.close()
             Relatorio().alterar(self.obrigacoes)
