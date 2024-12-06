@@ -47,6 +47,33 @@ def resource_path(relative_path):
         os.path.dirname(os.path.abspath(__file__)))
     return os.path.join(base_path, relative_path)
 
+class Obrigacao:
+    def __init__(self, interesses: list) -> None:
+        self.interesses = {key: list() for key in interesses}
+
+        # self.obrigacao = {
+        #     'GUIA FGTS DIGITAL': list(),
+        #     'Pro labore': list(),
+        #     'RESUMO FOLHA DE PAGAMENTO': list(),
+        #     'BOLETO - HONORÁRIO CONTÁBIL': list(),
+        # }
+        pass
+
+    def add_dados(self, dict_obriacoes: dict):
+        for interesse, lista in self.interesses.items():
+            lista.append('Pendente')
+            for key, situacao in dict_obriacoes.items():
+                print(f'\nkey - {key}')
+                print(f'interesse - {interesse}\n')
+                if interesse in key:
+                    if 'Ent.' in situacao:
+                        lista.pop()
+                        lista.append(f'Enviado: {situacao}')
+                    break
+
+    def result(self):
+        return pd.DataFrame(self.interesses)
+
 class Matriz(QObject):
     fim = Signal(dict)
     qnt_empresas = Signal(int)
@@ -130,18 +157,19 @@ class Relatorio:
             
         return nome_arq  + '.xlsx' 
     
-    def alterar(self, data: pd.DataFrame) -> None:
+    def alterar(self, data: dict[str, Obrigacao]) -> None:
         wb = Workbook()
-        ws = wb.active
-        self.width_ws(ws)
+        for key, obrigacao in data.items():
+            ws = wb.create_sheet(key)
+            self.width_ws(ws)
 
-        self.fill_cabecalho(data, ws)
-
-        self.fill_conteudo(data, ws)
+            df = obrigacao.result()
+            self.fill_cabecalho(df, ws)
+            self.fill_conteudo(df, ws)
 
         nome_arq = self.nomear()
         wb.save(nome_arq)
-          
+        
         showinfo(title='Aviso', message='Abrindo o arquivo gerado!')
         os.startfile(nome_arq)
 
@@ -181,9 +209,7 @@ class Acessorias:
     POSIC_NOME_EMP = '#divEmpZ_{0} > div.col-sm-5.col-xs-12.no-padding.aImage > span'
     POSIC_CNPJ_EMP = '#divEmpZ_{0} > div.col-sm-7.col-xs-12.no-padding.aImage > div:nth-child(1)'
 
-    def __init__(self, obrigacoes) -> None:
-        self.obrigacoes_desejadas = [i for i in obrigacoes]
-
+    def __init__(self) -> None:
         self.class_status_entrega = "col-sm-3.col-xs-12.no-padding"
         self.class_nome_entrega = 'neg.brown'
 
@@ -283,26 +309,6 @@ class Acessorias:
     def close(self):
         self.browser.close()
 
-class Obrigacoes:
-    def __init__(self) -> None:
-        self.interesses = {}
-        pass
-
-    def add_dados(self, dict_obriacoes: dict):
-        for obrigacao, lista in self.obrigacao.items():
-            lista.append('Pendente')
-            for key, situacao in dict_obriacoes.items():
-                print(f'\nkey - {key}')
-                print(f'obrigacao - {obrigacao}\n')
-                if obrigacao in key:
-                    if 'Ent.' in situacao:
-                        lista.pop()
-                        lista.append(f'Enviado: {situacao}')
-                    break
-
-    def result(self):
-        return pd.DataFrame(self.interesses)
-
 #TODO WELLINGTON
 class Wellington(QObject):
     progress = Signal(int)
@@ -319,15 +325,18 @@ class Wellington(QObject):
         }
 
         self.obrigacoes = {
-
+            'SO PRO LABORE': Obrigacao(
+                ['RESUMO FOLHA DE PAGAMENTO','DARF DCTFWEB','RECIBO DCTFWEB','ESOCIAL']
+            ),
+            'FOLHA SIMPLES': Obrigacao(
+                ['RESUMO FOLHA DE PAGAMENTO','DARF','RECIBO DCTFWEB','ESOCIAL','GUIA FGTS DIGITAL','RELATORIO FGTS DIGITAL']
+            ),
+            'FOLHA COM MOVIMENTO': Obrigacao(
+                ['RESUMO FOLHA DE PAGAMENTO','DARF','RECIBO DCTFWEB','ESOCIAL','GUIA FGTS DIGITAL','RELATORIO FGTS DIGITAL']
+            ),
+            'SEM MOVIMENTO': Obrigacao(['DARF DCTFWEB','RECIBO DCTFWEB','ESOCIAL']),
+            # 'SO DCTF': Obrigacao([''])
         }
-
-        # self.obrigacao = {
-        #     'GUIA FGTS DIGITAL': list(),
-        #     'Pro labore': list(),
-        #     'RESUMO FOLHA DE PAGAMENTO': list(),
-        #     'BOLETO - HONORÁRIO CONTÁBIL': list(),
-        # }
 
         self.credenciais = [
             os.getenv("LOGIN",""),
@@ -339,17 +348,21 @@ class Wellington(QObject):
     #TODO TRABALHAR
     def trabalhar(self) -> pd.DataFrame:
         try:
-            acessorias = Acessorias(self.obrigacao.keys())
+            acessorias = Acessorias()
             acessorias.login(self.credenciais[0], self.credenciais[1])
             sleep(5)
 
             #Implementar procura pela obrigação e adição de dados ao mesmo
             count = 0
-            for num in self.info_matriz:
-                self.filtro(acessorias.pesquisar_entrega(
-                    str(num), self.competencia
-                ))
-                count = count + 0.5
+            for categoria_matriz, list_num in self.info_matriz.items():
+                for categoria_obri, obrigacao in self.obrigacoes.items():
+                    if categoria_matriz == categoria_obri:
+                        for num in list_num:
+                            obrigacao.add_dados(acessorias.pesquisar_entrega(
+                                str(num), self.competencia
+                            ))
+                        break
+                count = count + 1
                 self.progress.emit(count)
 
             for num in self.info_matriz:
@@ -362,12 +375,7 @@ class Wellington(QObject):
             # print(f'empersa - {self.infos_empresa}\n\n')
             # print(f'obrigação - {self.obrigacao}')
 
-            Relatorio().alterar(
-                pd.DataFrame(
-                self.infos_empresa | self.obrigacao
-                )
-            )
-
+            Relatorio().alterar(self.obrigacoes)
             self.fim.emit()
         except Exception:
             traceback.print_exc()
@@ -445,7 +453,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.wellington.fim.connect(self._thread.deleteLater)
             self.wellington.fim.connect(self.encerramento)
             self._thread.finished.connect(self.wellington.deleteLater)
-            self.wellington.progress.connect(self.to_progress)
+            self.wellington.progress.connect(self.add_progress)
 
             self._thread.start()  
 
