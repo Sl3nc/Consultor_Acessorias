@@ -73,7 +73,7 @@ class Obrigacao:
                 if interesse in key:
                     if 'Ent.' in situacao:
                         lista.pop()
-                        lista.append(f'Enviado: {situacao[situacao.find('/',8) - 2:8]}')
+                        lista.append(f'Enviado: {situacao[25:33]}')
                     break
 
     def add_empresa(self, infos_emp: list[str]):
@@ -153,7 +153,7 @@ class Relatorio:
     def __init__(self) -> None:
         self.linha_cabecalho = 2
         self.linha_conteudo = 3
-        self.espacos_tabela = [50,20,20,10,30,30]
+        self.espacos_tabela = [50,30,30,30,30,30]
         pass
 
     def nomear(self) -> str:
@@ -226,7 +226,7 @@ class Acessorias:
         self.class_status_entrega = "col-sm-3.col-xs-12.no-padding"
         self.class_nome_entrega = 'neg.brown'
 
-        self.browser = self.make_chrome_browser(hide=False)
+        self.browser = self.make_chrome_browser(hide=True)
         self.browser.get(self.URL_MAIN)
         pass
 
@@ -380,6 +380,7 @@ class Wellington(QObject):
                 count = count + 1
                 self.progress.emit(count)
 
+            acessorias.close()
             Relatorio().alterar(self.obrigacoes)
             self.fim.emit()
         except Exception:
