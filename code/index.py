@@ -64,7 +64,7 @@ class Obrigacao:
         # }
         pass
 
-    def add_dados(self, dict_obriacoes: dict):
+    def add_dados(self, dict_obriacoes: dict[str,str]):
         for interesse, lista in self.interesses.items():
             lista.append('Pendente')
             for key, situacao in dict_obriacoes.items():
@@ -73,7 +73,7 @@ class Obrigacao:
                 if interesse in key:
                     if 'Ent.' in situacao:
                         lista.pop()
-                        lista.append(f'Enviado: {situacao}')
+                        lista.append(f'Enviado: {situacao[situacao.find('/',8) - 2:8]}')
                     break
 
     def add_empresa(self, infos_emp: list[str]):
@@ -169,13 +169,15 @@ class Relatorio:
     
     def alterar(self, data: dict[str, Obrigacao]) -> None:
         wb = Workbook()
+        del wb['Sheet']
         for key, obrigacao in data.items():
-            ws = wb.create_sheet(key)
-            self.width_ws(ws)
-
             df = obrigacao.result()
-            self.fill_cabecalho(df, ws)
-            self.fill_conteudo(df, ws)
+            if df.empty == False:
+                ws = wb.create_sheet(key)
+                self.width_ws(ws)
+
+                self.fill_cabecalho(df, ws)
+                self.fill_conteudo(df, ws)
 
         nome_arq = self.nomear()
         wb.save(nome_arq)
@@ -369,9 +371,7 @@ class Wellington(QObject):
             count = 0
             acessorias.set_competencia(self.competencia)
             for categoria_matriz, list_num in self.info_matriz.items():
-                print(categoria_matriz + '-'*40)
                 for categoria_obri, obrigacao in self.obrigacoes.items():
-                    print(categoria_matriz + '-'*40)
                     if categoria_matriz == categoria_obri:
                         for num in list_num:
                             obrigacao.add_dados(acessorias.pesquisar_entrega(str(num)))
