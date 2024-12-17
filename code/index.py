@@ -227,7 +227,7 @@ class Acessorias:
         self.class_status_entrega = "col-sm-3.col-xs-12.no-padding"
         self.class_nome_entrega = 'neg.brown'
 
-        self.browser = self.make_chrome_browser(hide=True)
+        self.browser = self.make_chrome_browser(hide=False)
         self.browser.get(self.URL_MAIN)
         pass
 
