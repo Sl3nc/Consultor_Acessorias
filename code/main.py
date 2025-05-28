@@ -1,42 +1,18 @@
-from pathlib import Path
-import os
-import sys
-import traceback
-from unidecode import unidecode
-from time import sleep
-from datetime import datetime, date
-
-import pandas as pd
-from pandas.errors import ParserError
-from openpyxl import Workbook, load_workbook
-from openpyxl.cell.text import InlineFont
-from openpyxl.cell.rich_text import TextBlock, CellRichText
-from openpyxl.utils import get_column_letter
-
-from selenium.webdriver.remote.webelement import WebElement
-from selenium import webdriver
-from selenium.common.exceptions import NoSuchElementException
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.support.wait import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from PySide6.QtWidgets import (
-    QMainWindow, QApplication, QWidget, QLabel, QVBoxLayout,QPushButton, QLineEdit
-)
+from PySide6.QtWidgets import QMainWindow, QApplication
 from PySide6.QtGui import QPixmap, QIcon, QMovie
-from PySide6.QtCore import QThread, QObject, Signal, QSize, QDate
+from PySide6.QtCore import QThread, QSize, QDate
+
 from src.window_acessorias import Ui_MainWindow
-
-from tkinter.messagebox import askyesno, showerror, showinfo
-from tkinter.filedialog import askopenfilename, asksaveasfilename
-from wellington import Wellington
-from matriz import Matriz
-
-import json
-from dotenv import load_dotenv
-
+from tkinter.messagebox import showerror
+from pandas.errors import ParserError
 from locale import setlocale, LC_ALL
+from wellington import Wellington
+from traceback import print_exc
+from dotenv import load_dotenv
+from datetime import datetime
+from matriz import Matriz
+from pathlib import Path
+import sys
 
 setlocale(LC_ALL, 'pt_BR.UTF-8')
 
@@ -141,7 +117,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             showerror(title='Aviso', message= 'Erro ao ler o arquivo, certifique-se de ter inserido o arquivo correto')
         except Exception as err:
             self.exec_load(False)
-            traceback.print_exc()
+            print_exc()
             showerror('Aviso', err)
 
     def encerramento(self):
