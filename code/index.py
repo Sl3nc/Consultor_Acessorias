@@ -40,13 +40,6 @@ setlocale(LC_ALL, 'pt_BR.UTF-8')
 
 load_dotenv(Path(__file__).parent / 'src' / 'env' / '.env')
 
-def resource_path(relative_path):
-    base_path = getattr(
-        sys,
-        '_MEIPASS',
-        os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(base_path, relative_path)
-
 class Obrigacao:
     def __init__(self, interesses: list) -> None:
         self.interesses = {key: list() for key in interesses}
@@ -202,7 +195,7 @@ class Relatorio:
             ws.column_dimensions[get_column_letter(index)].width = valor
 
 class Acessorias:
-    CHROME_DRIVER_PATH = resource_path('src\\driver\\chromedriver.exe')
+    CHROME_DRIVER_PATH = Path(__file__).parent/'src'/'driver'/'chromedriver.exe'
     URL_MAIN = 'https://app.acessorias.com/sysmain.php'
     URL_ENTREGAS = 'https://app.acessorias.com/sysmain.php?m=3'
     URL_EMPRESA = 'https://app.acessorias.com/sysmain.php?m=4'
@@ -399,14 +392,20 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.setupUi(self)
         self.matriz = Matriz()
 
-        self.setWindowIcon((QIcon(
-            resource_path('src\\imgs\\acessorias_icon.ico'))))
+        self.setWindowIcon(QIcon(
+            (Path(__file__).parent /'src'/'imgs'/'acessorias_icon.ico').__str__()))
         self.logo.setPixmap(QPixmap(
-            resource_path('src\\imgs\\acessorias_hori.png')))
+            (Path(__file__).parent /'src'/'imgs'/'acessorias_hori.png').__str__()))
         icon = QIcon()
-        icon.addFile(resource_path("src\\imgs\\upload-icon.png"), QSize(), QIcon.Mode.Normal, QIcon.State.Off)
+        icon.addFile(
+            (Path(__file__).parent /'src'/'imgs'/'upload-icon.png').__str__(),QSize(),
+            QIcon.Mode.Normal,
+            QIcon.State.Off
+        )
         self.pushButton_upload.setIcon(icon)
-        self.movie = QMovie(resource_path("src\\imgs\\load.gif"))
+        self.movie = QMovie(
+            (Path(__file__).parent /'src'/'imgs'/'load.gif').__str__()
+        )
         self.load_movie.setMovie(self.movie)
         data_atual = datetime.now()
         self.dateEdit_competencia.setDate(
