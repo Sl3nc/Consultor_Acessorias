@@ -41,7 +41,14 @@ setlocale(LC_ALL, 'pt_BR.UTF-8')
 load_dotenv(Path(__file__).parent / 'src' / 'env' / '.env')
 
 class Obrigacao:
+    """
+    Classe responsável por armazenar e manipular as obrigações de uma empresa,
+    bem como suas informações básicas (nome e CNPJ).
+    """
     def __init__(self, interesses: list) -> None:
+        """
+        Inicializa a Obrigacao com os interesses (tipos de obrigações) a serem acompanhados.
+        """
         self.interesses = {key: list() for key in interesses}
 
         self.infos_empresa = {
@@ -58,6 +65,9 @@ class Obrigacao:
         pass
 
     def add_dados(self, dict_obriacoes: dict[str,str]):
+        """
+        Adiciona o status das obrigações conforme os dados extraídos do sistema.
+        """
         for interesse, lista in self.interesses.items():
             lista.append('Pendente')
             for key, situacao in dict_obriacoes.items():
@@ -70,13 +80,22 @@ class Obrigacao:
                     break
 
     def add_empresa(self, infos_emp: list[str]):
+        """
+        Adiciona informações da empresa (nome e CNPJ) à Obrigacao.
+        """
         for index, listas in enumerate(self.infos_empresa.values()):
             listas.append(infos_emp[index])
 
     def result(self):
+        """
+        Retorna um DataFrame pandas com as informações da empresa e obrigações.
+        """
         return pd.DataFrame(self.infos_empresa | self.interesses)
 
 class Matriz(QObject):
+    """
+    Classe responsável por manipular a matriz de empresas, validando e lendo os dados do arquivo Excel.
+    """
     fim = Signal(dict)
     qnt_empresas = Signal(int)
 
@@ -88,6 +107,9 @@ class Matriz(QObject):
         pass
 
     def inserir(self) -> str | None:
+        """
+        Abre um diálogo para o usuário selecionar o arquivo da matriz e valida o arquivo selecionado.
+        """
         try:
             caminho = askopenfilename()
             if caminho == '':
@@ -108,6 +130,9 @@ class Matriz(QObject):
             return None
 
     def __validar_entrada(self, caminho: str) -> str:
+        """
+        Valida o formato do arquivo e remove acentos do nome, se necessário.
+        """
         if caminho[len(caminho) -3 :] != self.tipos_validos:
             ultima_barra = caminho.rfind('/')
             raise Exception(
@@ -121,13 +146,22 @@ class Matriz(QObject):
         return caminho
 
     def __renomear(self, caminho, caminho_uni) -> str:
+        """
+        Renomeia o arquivo para remover acentos do nome.
+        """
         os.renames(caminho, caminho_uni)
         return caminho
     
     def envio_invalido(self) -> bool:
+        """
+        Verifica se o caminho do arquivo foi definido corretamente.
+        """
         return True if self.caminho == None else False
 
     def ler(self) -> dict[str,list[int]]:
+        """
+        Lê os dados das empresas da matriz a partir do arquivo Excel.
+        """
         result = {}
         nomes_planilha = load_workbook(self.caminho).sheetnames
         for i in self.planilha_excecoes:
@@ -142,6 +176,9 @@ class Matriz(QObject):
         self.fim.emit(result)
 
 class Relatorio:
+    """
+    Classe responsável por gerar e salvar o relatório final em Excel, com os dados das obrigações das empresas.
+    """
     TITULO = 'Relatório'
 
     def __init__(self) -> None:
@@ -151,6 +188,9 @@ class Relatorio:
         pass
 
     def nomear(self) -> str:
+        """
+        Solicita ao usuário o nome do arquivo para salvar o relatório.
+        """
         nome_arq = asksaveasfilename(title='Favor nomear o arquivo que será salvo', filetypes=((".xlsx","*.xlsx"),))
 
         if nome_arq == '':
@@ -162,6 +202,9 @@ class Relatorio:
         return nome_arq  + '.xlsx' 
     
     def alterar(self, data: dict[str, Obrigacao]) -> None:
+        """
+        Cria e salva o relatório Excel com os dados fornecidos.
+        """
         wb = Workbook()
         del wb['Sheet']
         for key, obrigacao in data.items():
@@ -180,21 +223,34 @@ class Relatorio:
         os.startfile(nome_arq)
 
     def fill_conteudo(self, conteudo: pd.DataFrame, ws):
+        """
+        Preenche o conteúdo do relatório na planilha.
+        """
         for index_linha, row in conteudo.iterrows():
             for index_coluna, valor in enumerate(row, 1):
                 ws.cell(index_linha + self.linha_conteudo, index_coluna).value = valor
 
     def fill_cabecalho(self, conteudo: pd.DataFrame, ws):
+        """
+        Preenche o cabeçalho do relatório na planilha.
+        """
         for index_coluna, column in enumerate(conteudo.columns, 1):
             ws.cell(self.linha_cabecalho, index_coluna).value = CellRichText(
                 TextBlock(InlineFont(b=True), column)
             )
 
     def width_ws(self, ws):
+        """
+        Ajusta a largura das colunas da planilha.
+        """
         for index, valor in enumerate(self.espacos_tabela, 1):
             ws.column_dimensions[get_column_letter(index)].width = valor
 
 class Acessorias:
+    """
+    Classe responsável por interagir com o sistema web Acessorias.com via Selenium,
+    realizando login, pesquisa de entregas e extração de dados das empresas.
+    """
     CHROME_DRIVER_PATH = Path(__file__).parent/'src'/'driver'/'chromedriver.exe'
     URL_MAIN = 'https://app.acessorias.com/sysmain.php'
     URL_ENTREGAS = 'https://app.acessorias.com/sysmain.php?m=3'
@@ -225,6 +281,9 @@ class Acessorias:
         pass
 
     def make_chrome_browser(self,*options: str, hide: bool) -> webdriver.Chrome:
+        """
+        Inicializa o navegador Chrome com as opções fornecidas.
+        """
         chrome_options = webdriver.ChromeOptions()
 
         if options is not None:
@@ -246,12 +305,18 @@ class Acessorias:
         return browser
     
     def login(self, usuario: str, senha: str):
+        """
+        Realiza login no sistema Acessorias.com.
+        """
         self.browser.find_element(By.NAME, self.INPUT_EMAIL).send_keys(usuario)
         self.browser.find_element(By.NAME, self.INPUT_PASSWORD).send_keys(senha)
 
         self.browser.find_element(By.CSS_SELECTOR, self.BTN_ENTRAR).click()
 
     def pesquisar_entrega(self, num_empresa: str):
+        """
+        Pesquisa as entregas de uma empresa pelo número de domínio.
+        """
         if self.browser.current_url != self.URL_ENTREGAS:
             self.browser.get(self.URL_ENTREGAS)
 
@@ -268,6 +333,9 @@ class Acessorias:
         )
 
     def set_competencia(self, competencia: str):
+        """
+        Define a competência (período) para filtrar as entregas.
+        """
         self.browser.get(self.URL_ENTREGAS)
 
         for input in [self.COMPE_DE, self.COMPE_PARA]:
@@ -276,6 +344,9 @@ class Acessorias:
             .send_keys(competencia)
 
     def extrair_dados(self, tabela: WebElement):
+        """
+        Extrai os dados de entregas da tabela HTML.
+        """
         result = {}
 
         nome_competencia = [
@@ -293,6 +364,9 @@ class Acessorias:
         return result
 
     def pesquisar_empresa(self, num_empresa: str):
+        """
+        Pesquisa e retorna informações da empresa (nome e CNPJ).
+        """
         try:
             if self.browser.current_url != self.URL_EMPRESA:
                 self.browser.get(self.URL_EMPRESA)
@@ -321,10 +395,15 @@ class Acessorias:
 
 
     def close(self):
+        """
+        Fecha o navegador.
+        """
         self.browser.close()
 
-#TODO WELLINGTON
 class Wellington(QObject):
+    """
+    Classe que coordena o processamento das empresas, realizando a extração dos dados de obrigações e geração do relatório final.
+    """
     progress = Signal(int)
     fim = Signal()
 
@@ -358,6 +437,9 @@ class Wellington(QObject):
 
     #TODO TRABALHAR
     def trabalhar(self) -> pd.DataFrame:
+        """
+        Executa o fluxo principal: login, pesquisa de obrigações, coleta de dados e geração do relatório.
+        """
         try:
             acessorias = Acessorias()
             acessorias.login(self.credenciais[0], self.credenciais[1])
@@ -385,6 +467,9 @@ class Wellington(QObject):
             acessorias.close()
             
 class MainWindow(QMainWindow, Ui_MainWindow):
+    """
+    Classe principal da interface gráfica, responsável por gerenciar as interações do usuário, progresso e execução das tarefas.
+    """
     MAX_PROGRESS = 100
 
     def __init__(self, parent = None):
@@ -416,6 +501,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.pushButton_enviar.clicked.connect(self.ler_matriz)
 
     def inserir_arquivo(self):
+        """
+        Ação do botão para inserir o arquivo da matriz.
+        """
         resp = self.matriz.inserir()
 
         if resp != None:
@@ -423,6 +511,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.pushButton_upload.setIcon(QPixmap(''))
 
     def ler_matriz(self):
+        """
+        Inicia a leitura da matriz de empresas em uma thread separada.
+        """
         if self.matriz.envio_invalido():
             raise Exception('Favor anexar seu relatório de processos')
          
@@ -444,6 +535,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     #TODO HARD_WORK
     def hard_work(self, itens_matriz: dict):
+        """
+        Inicia o processamento das empresas e obrigações em uma thread separada.
+        """
         try:
             self.load_title.setText('Pesquisando empresas...')
             self.progressBar.show()
@@ -475,17 +569,29 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             showerror('Aviso', err)
 
     def encerramento(self):
+        """
+        Finaliza o processamento e exibe mensagem de sucesso.
+        """
         self.exec_load(False)
         self.statusbar.showMessage(
             f'Execução com êxito às {datetime.now().strftime('%H:%M:%S')}', 10)
         
     def set_progress(self, valor):
+        """
+        Define o coeficiente de progresso para a barra de progresso.
+        """
         self.coeficiente_progresso = self.MAX_PROGRESS / valor
 
     def add_progress(self, valor):
+        """
+        Atualiza o valor da barra de progresso.
+        """
         self.progressBar.setValue(self.coeficiente_progresso * valor)
 
     def exec_load(self, action: bool):
+        """
+        Controla a exibição da animação de carregamento.
+        """
         if action == True:
             self.movie.start()
             self.stackedWidget.setCurrentIndex(1)
@@ -494,6 +600,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.stackedWidget.setCurrentIndex(0)
 
 if __name__ == '__main__':
+    """
+    Ponto de entrada da aplicação. Inicializa a interface gráfica.
+    """
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()
