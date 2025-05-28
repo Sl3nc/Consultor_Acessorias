@@ -3,7 +3,7 @@
 code/src/__pycache__
 *~
 *.env
-*autosave
 /build
 /dist
 *.spec
+*.autosave
